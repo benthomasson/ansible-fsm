@@ -9,10 +9,15 @@ Options:
     --debug            Show debug logging
     --verbose        Show verbose logging
 """
+from gevent import monkey
+monkey.patch_all()
+import gevent
+
 from docopt import docopt
 import logging
 import sys
 import yaml
+from ansible_fsm.event import ZMQEventChannel
 
 from ansible_fsm.parser import parse_to_ast
 
@@ -36,6 +41,9 @@ def main(args=None):
 
     ast = parse_to_ast(data)
     print (ast)
+
+    event = ZMQEventChannel()
+    gevent.joinall([event.zmq_thread])
 
     return 0
 

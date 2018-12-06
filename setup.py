@@ -11,8 +11,10 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = [ 'docopt',
-                 'pyyaml']
+requirements = ['docopt',
+                'pyyaml',
+                'pyzmq',
+                'gevent_fsm']
 
 setup_requirements = ['pytest-runner', ]
 
@@ -51,6 +53,7 @@ setup(
     entry_points={
         'console_scripts': [
             'ansible-fsm = ansible_fsm.cli:main',
+            'send-event = ansible_fsm.send_event:main',
         ],
     }
 )
