@@ -6,9 +6,6 @@
 import pytest
 
 
-from ansible_fsm import ansible_fsm
-
-
 @pytest.fixture
 def response():
     """Sample pytest fixture.
