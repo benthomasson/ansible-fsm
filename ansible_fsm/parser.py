@@ -43,8 +43,8 @@ def parse_to_state(input_data):
     check_type(handlers, dict, "Handlers should a be dict")
 
     new_handlers = []
-    for name, value in handlers.items():
-        new_handlers.append(parse_to_handler(name, value))
+    for handler_name, value in handlers.items():
+        new_handlers.append(parse_to_handler(handler_name, value))
 
     return ast.State(name, new_handlers)
 

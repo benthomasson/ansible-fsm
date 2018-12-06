@@ -20,6 +20,8 @@ import yaml
 from ansible_fsm.event import ZMQEventChannel
 
 from ansible_fsm.parser import parse_to_ast
+from .tracer import ConsoleTraceLog
+from .fsm import FSMController, State
 
 logger = logging.getLogger('cli')
 
@@ -42,8 +44,32 @@ def main(args=None):
     ast = parse_to_ast(data)
     print (ast)
 
+
+    tracer = ConsoleTraceLog()
+
+    fsms = []
+
+    for fsm_id, fsm in enumerate(ast.fsms):
+        states = {}
+        for state in fsm.states:
+            handlers = {}
+            for handler in state.handlers:
+                handlers[handler.name] = handler.body
+            states[state.name] = State(state.name, handlers)
+        print (states)
+        fsm_controller = FSMController(dict(),
+                                       fsm.name,
+                                       fsm_id,
+                                       states,
+                                       states.get('Start'),
+                                       tracer,
+                                       tracer)
+        fsms.append(fsm_controller)
+
+    fsm_threads = [x.thread for x in fsms]
+
     event = ZMQEventChannel()
-    gevent.joinall([event.zmq_thread])
+    gevent.joinall(fsm_threads)
 
     return 0
 

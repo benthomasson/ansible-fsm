@@ -14,7 +14,7 @@ with open('HISTORY.rst') as history_file:
 requirements = ['docopt',
                 'pyyaml',
                 'pyzmq',
-                'gevent_fsm']
+                'gevent']
 
 setup_requirements = ['pytest-runner', ]
 

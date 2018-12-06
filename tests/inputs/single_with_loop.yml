@@ -5,11 +5,15 @@
       - name: Start
         handlers:
             enter:
-                - change_state: End
+                - change_state: Loop1
             exit:
                 - debug:
                     msg: Exit
-      - name: End
+      - name: Loop1
         handlers:
             enter:
-                - shutdown:
+                - change_state: Loop2
+      - name: Loop2
+        handlers:
+            enter:
+                - change_state: Loop1
