@@ -1,14 +1,27 @@
 
 from . import ast
 
+
 class ParseException(Exception):
 
     pass
 
 
+def check_fields(o, type_name, required_fields, all_fields):
+
+    for field in required_fields:
+        if field not in o.keys():
+            raise ParseException("{0} element requires field {1}".format(type_name, field))
+
+    for field in o.keys():
+        if field not in all_fields:
+            raise ParseException("Unknown field {1} in {0} element".format(type_name, field))
+
+
 def check_type(o, types, message):
     if not isinstance(o, types):
         raise ParseException(message)
+
 
 def parse_to_handler(name, body):
 
@@ -20,6 +33,8 @@ def parse_to_handler(name, body):
 def parse_to_state(input_data):
 
     check_type(input_data, dict, "State elements should be a dict")
+    check_fields(input_data, "FSM", ['name'], ['name',
+                                               'handlers'])
 
     name = input_data.get('name', '')
     handlers = input_data.get('handlers', {})
@@ -33,9 +48,15 @@ def parse_to_state(input_data):
 
     return ast.State(name, new_handlers)
 
+
 def parse_to_fsm(input_data):
 
     check_type(input_data, dict, "FSM elements should be a dict")
+    check_fields(input_data, "FSM", ['name'], ['name',
+                                               'hosts',
+                                               'gather_facts',
+                                               'roles',
+                                               'states'])
 
     name = input_data.get('name', '')
     hosts = input_data.get('hosts', [])
@@ -53,6 +74,7 @@ def parse_to_fsm(input_data):
         new_states.append(parse_to_state(state))
     return ast.FSM(name, hosts, gather_facts, roles, new_states)
 
+
 def parse_to_ast(input_data):
 
     fsms = []
@@ -64,4 +86,3 @@ def parse_to_ast(input_data):
         fsms.append(parse_to_fsm(element))
 
     return new_ast
-
