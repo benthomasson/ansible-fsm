@@ -110,6 +110,7 @@ class FSMController(object):
         while True:
             gevent.sleep(1)
             message = self.inbox.get()
+            print(message)
             message_type = message.name
             if message_type == 'Shutdown':
                 break

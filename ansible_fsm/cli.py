@@ -68,7 +68,7 @@ def main(args=None):
 
     fsm_threads = [x.thread for x in fsms]
 
-    event = ZMQEventChannel()
+    event = ZMQEventChannel(fsms)
     gevent.joinall(fsm_threads)
 
     return 0

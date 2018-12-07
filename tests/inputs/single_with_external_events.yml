@@ -1,0 +1,16 @@
+- name: FSM1
+  gather_facts: False
+  hosts: localhost
+  states:
+      - name: Start
+        handlers:
+            enter:
+                - change_state: A
+      - name: A
+        handlers:
+            event1:
+                - change_state: B
+      - name: B
+        handlers:
+            event2:
+                - change_state: A
