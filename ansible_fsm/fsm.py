@@ -84,6 +84,7 @@ class FSMController(object):
         self.state = initial_state
         self.states = states
         self.inbox = Queue()
+        self.self_channel = Channel(self, self, tracer, self.inbox)
         self.thread = gevent.spawn(self.receive_messages)
         self.state.exec_handler('enter', self)
 
@@ -112,7 +113,9 @@ class FSMController(object):
             message_type = message.name
             if message_type == 'Shutdown':
                 break
-            elif message_type == 'ChangeState':
+            elif message_type == 'ChangeState' and self.state.name != message.args['current_state']:
+                pass
+            elif message_type == 'ChangeState' and self.state.name == message.args['current_state']:
                 self.change_state(self.states[message.args['next_state']],
                                   message.args['handling_message_type'])
             else:
@@ -139,17 +142,18 @@ class State(object):
                         special_handler(controller, task, msg_type)
 
     def handle_change_state(self, controller, task, msg_type):
-        controller.inbox.put(messages.Event(controller.fsm_id,
-                                            controller.fsm_id,
-                                            'ChangeState',
-                                            dict(next_state=task['change_state'],
-                                                 handling_message_type=msg_type)))
+        controller.self_channel.put(messages.Event(controller.fsm_id,
+                                                   controller.fsm_id,
+                                                   'ChangeState',
+                                                   dict(current_state=self.name,
+                                                        next_state=task['change_state'],
+                                                        handling_message_type=msg_type)))
 
     def handle_shutdown(self, controller, task, msg_type):
-        controller.inbox.put(messages.Event(controller.fsm_id,
-                                            controller.fsm_id,
-                                            'Shutdown',
-                                            dict(handling_message_type=msg_type)))
+        controller.self_channel.put(messages.Event(controller.fsm_id,
+                                                   controller.fsm_id,
+                                                   'Shutdown',
+                                                   dict(handling_message_type=msg_type)))
 
 
 class _NullTracer(object):
