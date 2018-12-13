@@ -14,7 +14,8 @@ with open('HISTORY.rst') as history_file:
 requirements = ['docopt',
                 'pyyaml',
                 'pyzmq',
-                'gevent']
+                'gevent',
+                'ansible_task_worker']
 
 setup_requirements = ['pytest-runner', ]
 

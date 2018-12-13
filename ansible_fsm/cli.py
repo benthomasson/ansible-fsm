@@ -57,6 +57,8 @@ def main(args=None):
                 handlers[handler.name] = handler.body
             states[state.name] = State(state.name, handlers)
         print (states)
+        if 'Start' not in states:
+            raise Exception('Missing required "Start" state in FSM: "{0}"'.format(fsm.name))
         fsm_controller = FSMController(dict(),
                                        fsm.name,
                                        fsm_id,

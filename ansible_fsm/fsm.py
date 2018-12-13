@@ -1,10 +1,12 @@
 
 
 import gevent
-from gevent.queue import PriorityQueue
+from gevent.queue import PriorityQueue, Queue
 
 from .conf import settings
 from . import messages
+from ansible_task_worker.worker import AnsibleTaskWorker
+from ansible_task_worker.messages import Task, Inventory, TaskComplete
 
 
 class _Channel(object):
@@ -86,6 +88,10 @@ class FSMController(object):
         self.states = states
         self.inbox = PriorityQueue()
         self.self_channel = Channel(self, self, tracer, self.inbox)
+        self.worker = AnsibleTaskWorker(tracer)
+        self.worker_output_queue = Queue()
+        self.worker.controller.outboxes['output'] = self.worker_output_queue
+        self.worker.queue.put(Inventory(0, 'localhost ansible_connection=local'))
         self.thread = gevent.spawn(self.receive_messages)
         self.state.exec_handler('enter', self)
 
@@ -138,24 +144,35 @@ class State(object):
             print("{0} running {1}".format(self.name, msg_type))
             for task in self.handlers[msg_type]:
                 print(task)
+                found_special_handler = False
                 for cmd in FSM_TASKS:
+                    # task is a dict
                     if cmd in task:
+                        found_special_handler = True
                         special_handler = getattr(self, 'handle_' + cmd)
                         special_handler(controller, task, msg_type)
+                        break
+                if not found_special_handler:
+                    print("send task to ansible: {0}".format(task))
+                    controller.worker.queue.put(Task(0, 0, [task]))
+                    while True:
+                        worker_message = controller.worker_output_queue.get()
+                        if isinstance(worker_message, TaskComplete):
+                            break
 
     def handle_change_state(self, controller, task, msg_type):
         controller.self_channel.put((0, messages.Event(controller.fsm_id,
-                                                   controller.fsm_id,
-                                                   'ChangeState',
-                                                   dict(current_state=self.name,
-                                                        next_state=task['change_state'],
-                                                        handling_message_type=msg_type))))
+                                                       controller.fsm_id,
+                                                       'ChangeState',
+                                                       dict(current_state=self.name,
+                                                            next_state=task['change_state'],
+                                                            handling_message_type=msg_type))))
 
     def handle_shutdown(self, controller, task, msg_type):
         controller.self_channel.put((0, messages.Event(controller.fsm_id,
-                                                   controller.fsm_id,
-                                                   'Shutdown',
-                                                   dict(handling_message_type=msg_type))))
+                                                       controller.fsm_id,
+                                                       'Shutdown',
+                                                       dict(handling_message_type=msg_type))))
 
 
 class _NullTracer(object):
