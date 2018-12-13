@@ -13,7 +13,11 @@
         handlers:
             enter:
                 - change_state: Loop2
+            die:
+                - shutdown:
       - name: Loop2
         handlers:
             enter:
                 - change_state: Loop1
+            die:
+                - shutdown:

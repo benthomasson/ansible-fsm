@@ -22,10 +22,10 @@ class ZMQEventChannel(object):
             msg_data = yaml.safe_load(message.pop(0).decode())
             print (id, msg_type, msg_data)
             to_fsm_id = msg_data.get('to_fsm_id', None)
-            self.fsms[to_fsm_id].inbox.put(messages.Event(None,
+            self.fsms[to_fsm_id].inbox.put((1, messages.Event(None,
                                                           self.fsms[to_fsm_id].fsm_id,
                                                           msg_data['name'],
-                                                          msg_data['args']))
+                                                          msg_data['args'])))
 
             self.socket.send_multipart([id, b'Processed'])
             gevent.sleep(0)

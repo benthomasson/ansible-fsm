@@ -1,7 +1,7 @@
 
 
 import gevent
-from gevent.queue import Queue
+from gevent.queue import PriorityQueue
 
 from .conf import settings
 from . import messages
@@ -11,19 +11,20 @@ class _Channel(object):
 
     def __init__(self, from_fsm, to_fsm, tracer, queue=None):
         if queue is None:
-            self.queue = Queue()
+            self.queue = PriorityQueue()
         else:
             self.queue = queue
         self.from_fsm = from_fsm
         self.to_fsm = to_fsm
         self.tracer = tracer
 
-    def put(self, item):
+    def put(self, priority_item):
+        priority, item = priority_item
         self.tracer.send_trace_message(messages.ChannelTrace(self.tracer.trace_order_seq(),
                                                              self.from_fsm.fsm_id if self.from_fsm else None,
                                                              self.to_fsm.fsm_id if self.to_fsm else None,
                                                              item.name))
-        self.queue.put(item)
+        self.queue.put(priority_item)
 
     def get(self, block=True, timeout=None):
         return self.queue.get(block, timeout)
@@ -37,7 +38,7 @@ def Channel(from_fsm, to_fsm, tracer, queue=None):
     if queue is not None:
         return queue
     else:
-        return Queue()
+        return PriorityQueue()
 
 
 class _NullChannel(object):
@@ -83,7 +84,7 @@ class FSMController(object):
         self.channel_tracer = channel_tracer
         self.state = initial_state
         self.states = states
-        self.inbox = Queue()
+        self.inbox = PriorityQueue()
         self.self_channel = Channel(self, self, tracer, self.inbox)
         self.thread = gevent.spawn(self.receive_messages)
         self.state.exec_handler('enter', self)
@@ -108,8 +109,8 @@ class FSMController(object):
     def receive_messages(self):
 
         while True:
-            gevent.sleep(1)
-            message = self.inbox.get()
+            gevent.sleep(0.1)
+            priority, message = self.inbox.get()
             print(message)
             message_type = message.name
             if message_type == 'Shutdown':
@@ -143,18 +144,18 @@ class State(object):
                         special_handler(controller, task, msg_type)
 
     def handle_change_state(self, controller, task, msg_type):
-        controller.self_channel.put(messages.Event(controller.fsm_id,
+        controller.self_channel.put((0, messages.Event(controller.fsm_id,
                                                    controller.fsm_id,
                                                    'ChangeState',
                                                    dict(current_state=self.name,
                                                         next_state=task['change_state'],
-                                                        handling_message_type=msg_type)))
+                                                        handling_message_type=msg_type))))
 
     def handle_shutdown(self, controller, task, msg_type):
-        controller.self_channel.put(messages.Event(controller.fsm_id,
+        controller.self_channel.put((0, messages.Event(controller.fsm_id,
                                                    controller.fsm_id,
                                                    'Shutdown',
-                                                   dict(handling_message_type=msg_type)))
+                                                   dict(handling_message_type=msg_type))))
 
 
 class _NullTracer(object):
