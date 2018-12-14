@@ -6,7 +6,9 @@ from gevent.queue import PriorityQueue, Queue
 from .conf import settings
 from . import messages
 from ansible_task_worker.worker import AnsibleTaskWorker
-from ansible_task_worker.messages import Task, Inventory, TaskComplete
+from ansible_task_worker.messages import Task, Inventory, TaskComplete, RunnerMessage
+
+from pprint import pprint
 
 
 class _Channel(object):
@@ -142,8 +144,9 @@ class State(object):
     def exec_handler(self, msg_type, controller):
         if msg_type in self.handlers:
             print("{0} running {1}".format(self.name, msg_type))
-            for task in self.handlers[msg_type]:
-                print(task)
+            for task_id, task in enumerate(self.handlers[msg_type]):
+                task_failed = False
+                print(task_id, task)
                 found_special_handler = False
                 for cmd in FSM_TASKS:
                     # task is a dict
@@ -154,11 +157,24 @@ class State(object):
                         break
                 if not found_special_handler:
                     print("send task to ansible: {0}".format(task))
-                    controller.worker.queue.put(Task(0, 0, [task]))
+                    controller.worker.queue.put(Task(task_id, 0, [task]))
                     while True:
                         worker_message = controller.worker_output_queue.get()
-                        if isinstance(worker_message, TaskComplete):
-                            break
+                        if isinstance(worker_message, RunnerMessage) :
+                            if worker_message.data.get('event_data', {}).get('task', None) == 'pause_for_kernel':
+                                pass
+                            elif worker_message.data.get('event_data', {}).get('task', None) == 'include_tasks':
+                                pass
+                            else:
+                                if worker_message.data.get('event') == 'runner_on_failed':
+                                    task_failed = True
+                        elif isinstance(worker_message, TaskComplete):
+                            print (worker_message)
+                            if task_failed:
+                                self.exec_handler('failure', controller)
+                                return
+                            else:
+                                break
 
     def handle_change_state(self, controller, task, msg_type):
         controller.self_channel.put((0, messages.Event(controller.fsm_id,
