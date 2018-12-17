@@ -96,6 +96,8 @@ class FSMController(object):
         self.worker.queue.put(Inventory(0, 'localhost ansible_connection=local'))
         self.thread = gevent.spawn(self.receive_messages)
         self.state.exec_handler('enter', self)
+        self.shutting_down = False
+        self.is_shutdown = False
 
     def change_state(self, state, handling_message_type):
         if self.state:
@@ -114,20 +116,29 @@ class FSMController(object):
     def handle_message(self, message_type, message):
         self.state.exec_handler(message_type, self)
 
+    def shutdown(self):
+        self.shutting_down = True
+        if self.is_shutdown:
+            return
+        self.worker.queue.put(ShutdownRequested())
+        for _ in range(10):
+            gevent.sleep(1)
+            worker_message = self.worker_output_queue.get()
+            if isinstance(worker_message, ShutdownComplete) :
+                break
+        self.is_shutdown = True
+
     def receive_messages(self):
 
-        while True:
+        while not self.shutting_down:
             gevent.sleep(0.1)
             priority, message = self.inbox.get()
+            if self.shutting_down:
+                break
             print(message)
             message_type = message.name
             if message_type == 'Shutdown':
-                self.worker.queue.put(ShutdownRequested())
-                for _ in range(10):
-                    gevent.sleep(1)
-                    worker_message = self.worker_output_queue.get()
-                    if isinstance(worker_message, ShutdownComplete) :
-                        break
+                self.shutdown()
                 break
             elif message_type == 'ChangeState' and self.state.name != message.args['current_state']:
                 pass
