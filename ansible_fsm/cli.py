@@ -22,10 +22,11 @@ from docopt import docopt
 import logging
 import sys
 import yaml
+from itertools import count
 from ansible_fsm.event import ZMQEventChannel
 
 from ansible_fsm.parser import parse_to_ast
-from .tracer import ConsoleTraceLog
+from .tracer import ConsoleTraceLog, FileSystemTraceLog
 from .fsm import FSMController, State
 
 logger = logging.getLogger('cli')
@@ -49,21 +50,21 @@ def main(args=None):
     fsm_registry = dict()
 
     ast = parse_to_ast(data)
-    print (ast)
 
-
-    tracer = ConsoleTraceLog()
+    tracer = FileSystemTraceLog('fsm.log')
 
     fsms = []
 
-    for fsm_id, fsm in enumerate(ast.fsms):
+    fsm_id_seq = count(0)
+
+    for fsm in ast.fsms:
+        fsm_id = next(fsm_id_seq)
         states = {}
         for state in fsm.states:
             handlers = {}
             for handler in state.handlers:
                 handlers[handler.name] = handler.body
             states[state.name] = State(state.name, handlers)
-        print (states)
         if 'Start' not in states:
             raise Exception('Missing required "Start" state in FSM: "{0}"'.format(fsm.name))
         fsm_controller = FSMController(fsm.name,
@@ -72,7 +73,8 @@ def main(args=None):
                                        states.get('Start'),
                                        tracer,
                                        tracer,
-                                       fsm_registry)
+                                       fsm_registry,
+                                       fsm_id_seq)
         fsms.append(fsm_controller)
 
     fsm_threads = [x.thread for x in fsms]

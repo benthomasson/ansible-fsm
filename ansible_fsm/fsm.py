@@ -8,9 +8,6 @@ from . import messages
 from ansible_task_worker.worker import AnsibleTaskWorker
 from ansible_task_worker.messages import Task, Inventory, TaskComplete, RunnerMessage, ShutdownRequested, ShutdownComplete
 
-from pprint import pprint
-
-
 class _Channel(object):
 
     def __init__(self, from_fsm, to_fsm, tracer, queue=None):
@@ -80,7 +77,7 @@ def NullChannel(from_fsm, tracer):
 
 class FSMController(object):
 
-    def __init__(self, name, fsm_id, states, initial_state, tracer, channel_tracer, fsm_registry):
+    def __init__(self, name, fsm_id, states, initial_state, tracer, channel_tracer, fsm_registry, fsm_id_seq):
         self.shutting_down = False
         self.is_shutdown = False
         self.fsm_registry = fsm_registry
@@ -92,7 +89,7 @@ class FSMController(object):
         self.states = states
         self.inbox = PriorityQueue()
         self.self_channel = Channel(self, self, tracer, self.inbox)
-        self.worker = AnsibleTaskWorker(tracer)
+        self.worker = AnsibleTaskWorker(tracer, next(fsm_id_seq))
         self.worker_output_queue = Queue()
         self.worker.controller.outboxes['output'] = self.worker_output_queue
         self.worker.queue.put(Inventory(0, 'localhost ansible_connection=local'))
@@ -137,7 +134,6 @@ class FSMController(object):
             priority, message = self.inbox.get()
             if self.shutting_down:
                 break
-            print(message)
             message_type = message.name
             if message_type == 'Shutdown':
                 self.shutdown()
@@ -162,10 +158,8 @@ class State(object):
 
     def exec_handler(self, msg_type, controller):
         if msg_type in self.handlers:
-            print("{0} running {1}".format(self.name, msg_type))
             for task_id, task in enumerate(self.handlers[msg_type]):
                 task_failed = False
-                print(task_id, task)
                 found_special_handler = False
                 for cmd in FSM_TASKS:
                     # task is a dict
@@ -175,7 +169,6 @@ class State(object):
                         special_handler(controller, task, msg_type)
                         break
                 if not found_special_handler:
-                    print("send task to ansible: {0}".format(task))
                     controller.worker.queue.put(Task(task_id, 0, [task]))
                     while True:
                         worker_message = controller.worker_output_queue.get()
@@ -188,7 +181,6 @@ class State(object):
                                 if worker_message.data.get('event') == 'runner_on_failed':
                                     task_failed = True
                         elif isinstance(worker_message, TaskComplete):
-                            print (worker_message)
                             if task_failed:
                                 self.exec_handler('failure', controller)
                                 return
@@ -210,7 +202,6 @@ class State(object):
                                                        dict(handling_message_type=msg_type))))
 
     def handle_send_event(self, controller, task, msg_type):
-        print (task)
         send_event = task['send_event']
         to_fsm_id = send_event['fsm']
         controller.fsm_registry[to_fsm_id].inbox.put((1, messages.Event(None,

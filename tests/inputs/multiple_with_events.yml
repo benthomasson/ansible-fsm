@@ -13,7 +13,7 @@
       - name: B
         handlers:
             event2:
-                - change_state: A
+                - shutdown:
 - name: FSM2
   gather_facts: False
   hosts: localhost
@@ -30,4 +30,5 @@
                 - send_event:
                     fsm: FSM1
                     name: event1
+                - shutdown:
 
