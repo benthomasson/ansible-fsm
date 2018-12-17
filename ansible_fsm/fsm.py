@@ -6,7 +6,7 @@ from gevent.queue import PriorityQueue, Queue
 from .conf import settings
 from . import messages
 from ansible_task_worker.worker import AnsibleTaskWorker
-from ansible_task_worker.messages import Task, Inventory, TaskComplete, RunnerMessage
+from ansible_task_worker.messages import Task, Inventory, TaskComplete, RunnerMessage, ShutdownRequested, ShutdownComplete
 
 from pprint import pprint
 
@@ -122,6 +122,12 @@ class FSMController(object):
             print(message)
             message_type = message.name
             if message_type == 'Shutdown':
+                self.worker.queue.put(ShutdownRequested())
+                for _ in range(10):
+                    gevent.sleep(1)
+                    worker_message = self.worker_output_queue.get()
+                    if isinstance(worker_message, ShutdownComplete) :
+                        break
                 break
             elif message_type == 'ChangeState' and self.state.name != message.args['current_state']:
                 pass

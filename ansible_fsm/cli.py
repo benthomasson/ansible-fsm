@@ -9,9 +9,14 @@ Options:
     --debug            Show debug logging
     --verbose        Show verbose logging
 """
+
 from gevent import monkey
 monkey.patch_all()
 import gevent
+
+import logging
+FORMAT = "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
+logging.basicConfig(filename='ansible_fsm.log', level=logging.DEBUG, format=FORMAT) # noqa
 
 from docopt import docopt
 import logging
