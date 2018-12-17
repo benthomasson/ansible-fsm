@@ -12,12 +12,16 @@
       - name: Loop1
         handlers:
             enter:
+                - debug:
+                    msg: Loop1
                 - change_state: Loop2
             die:
                 - shutdown:
       - name: Loop2
         handlers:
             enter:
+                - debug:
+                    msg: Loop2
                 - change_state: Loop1
             die:
                 - shutdown:
