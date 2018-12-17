@@ -86,8 +86,11 @@ def main(args=None):
     event = ZMQEventChannel(fsm_registry)
     try:
         gevent.joinall(fsm_threads)
+    except KeyboardInterrupt:
+        print ('Caught KeyboardInterrupt shutting down...')
     finally:
         for fsm in fsms:
             fsm.shutdown()
+        print ('Successful shutdown')
     return 0
 
