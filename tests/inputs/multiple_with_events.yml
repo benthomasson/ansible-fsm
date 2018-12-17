@@ -1,0 +1,33 @@
+- name: FSM1
+  gather_facts: False
+  hosts: localhost
+  states:
+      - name: Start
+        handlers:
+            enter:
+                - change_state: A
+      - name: A
+        handlers:
+            event1:
+                - change_state: B
+      - name: B
+        handlers:
+            event2:
+                - change_state: A
+- name: FSM2
+  gather_facts: False
+  hosts: localhost
+  states:
+      - name: Start
+        handlers:
+            enter:
+                - send_event:
+                    fsm: FSM1
+                    name: event1
+                - send_event:
+                    fsm: FSM1
+                    name: event2
+                - send_event:
+                    fsm: FSM1
+                    name: event1
+

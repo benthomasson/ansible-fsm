@@ -46,6 +46,8 @@ def main(args=None):
     with open(parsed_args['<fsm.yml>']) as f:
         data = yaml.safe_load(f.read())
 
+    fsm_registry = dict()
+
     ast = parse_to_ast(data)
     print (ast)
 
@@ -64,18 +66,22 @@ def main(args=None):
         print (states)
         if 'Start' not in states:
             raise Exception('Missing required "Start" state in FSM: "{0}"'.format(fsm.name))
-        fsm_controller = FSMController(dict(),
-                                       fsm.name,
+        fsm_controller = FSMController(fsm.name,
                                        fsm_id,
                                        states,
                                        states.get('Start'),
                                        tracer,
-                                       tracer)
+                                       tracer,
+                                       fsm_registry)
         fsms.append(fsm_controller)
 
     fsm_threads = [x.thread for x in fsms]
+    fsm_registry.update({x.name: x for x in fsms})
 
-    event = ZMQEventChannel(fsms)
+    for fsm in fsms:
+        fsm.enter()
+
+    event = ZMQEventChannel(fsm_registry)
     try:
         gevent.joinall(fsm_threads)
     finally:

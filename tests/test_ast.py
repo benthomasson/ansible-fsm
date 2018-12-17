@@ -54,3 +54,12 @@ def test_single_with_handlers():
     assert single_ast.fsms[0].states[0].handlers[0].name == "enter"
     assert single_ast.fsms[0].states[0].handlers[1].name == "exit"
     assert single_ast.fsms[0].states[1].handlers[0].name == "enter"
+
+def test_multiple():
+    data = load_test_fsm('multiple.yml')
+    multiple_ast = parser.parse_to_ast(data)
+    assert len(multiple_ast.fsms) == 2
+    assert multiple_ast.fsms[0].name == "FSM1"
+    assert type(multiple_ast.fsms[0]) == ast.FSM
+    assert multiple_ast.fsms[1].name == "FSM2"
+    assert type(multiple_ast.fsms[1]) == ast.FSM

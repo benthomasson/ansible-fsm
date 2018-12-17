@@ -80,8 +80,10 @@ def NullChannel(from_fsm, tracer):
 
 class FSMController(object):
 
-    def __init__(self, context, name, fsm_id, states, initial_state, tracer, channel_tracer):
-        self.context = context
+    def __init__(self, name, fsm_id, states, initial_state, tracer, channel_tracer, fsm_registry):
+        self.shutting_down = False
+        self.is_shutdown = False
+        self.fsm_registry = fsm_registry
         self.name = name
         self.fsm_id = fsm_id
         self.tracer = tracer
@@ -95,9 +97,9 @@ class FSMController(object):
         self.worker.controller.outboxes['output'] = self.worker_output_queue
         self.worker.queue.put(Inventory(0, 'localhost ansible_connection=local'))
         self.thread = gevent.spawn(self.receive_messages)
+
+    def enter(self):
         self.state.exec_handler('enter', self)
-        self.shutting_down = False
-        self.is_shutdown = False
 
     def change_state(self, state, handling_message_type):
         if self.state:
@@ -149,7 +151,7 @@ class FSMController(object):
                 self.handle_message(message_type, message)
 
 
-FSM_TASKS = ['change_state', 'shutdown']
+FSM_TASKS = ['change_state', 'shutdown', 'send_event']
 
 
 class State(object):
@@ -206,6 +208,16 @@ class State(object):
                                                        controller.fsm_id,
                                                        'Shutdown',
                                                        dict(handling_message_type=msg_type))))
+
+    def handle_send_event(self, controller, task, msg_type):
+        print (task)
+        send_event = task['send_event']
+        to_fsm_id = send_event['fsm']
+        controller.fsm_registry[to_fsm_id].inbox.put((1, messages.Event(None,
+                                                                  controller.fsm_registry[to_fsm_id].fsm_id,
+                                                                  send_event['name'],
+                                                                  send_event.get('args', {}))))
+        pass
 
 
 class _NullTracer(object):

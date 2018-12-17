@@ -44,7 +44,6 @@ def main(args=None):
                       parsed_args['<fsm-id>'],
                       parsed_args['<event-name>'],
                       args))
-              
 
 
     return 0
