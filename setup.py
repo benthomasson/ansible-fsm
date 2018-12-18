@@ -17,6 +17,9 @@ requirements = ['docopt',
                 'gevent',
                 'ansible_task_worker']
 
+dependency_links = [
+                'git+https://github.com/benthomasson/ansible-task-worker.git#egg=ansible_task_worker-0.0.1']
+
 setup_requirements = ['pytest-runner', ]
 
 test_requirements = ['pytest', ]
@@ -24,6 +27,7 @@ test_requirements = ['pytest', ]
 setup(
     author="Ben Thomasson",
     author_email='bthomass@redhat.com',
+    dependency_links=dependency_links,
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',
