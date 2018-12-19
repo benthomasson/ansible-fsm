@@ -5,9 +5,10 @@ Usage:
     ansible-fsm [options] <fsm.yml>
 
 Options:
-    -h, --help        Show this page
-    --debug            Show debug logging
+    -h, --help       Show this page
+    --debug          Show debug logging
     --verbose        Show verbose logging
+    --inventory=<i>  Use a specific inventory
 """
 
 from gevent import monkey
@@ -43,6 +44,7 @@ def main(args=None):
     else:
         logging.basicConfig(level=logging.WARNING)
 
+    default_inventory = 'localhost ansible_connection=local'
 
     with open(parsed_args['<fsm.yml>']) as f:
         data = yaml.safe_load(f.read())
@@ -74,7 +76,8 @@ def main(args=None):
                                        tracer,
                                        tracer,
                                        fsm_registry,
-                                       fsm_id_seq)
+                                       fsm_id_seq,
+                                       parsed_args['--inventory'] or default_inventory)
         fsms.append(fsm_controller)
 
     fsm_threads = [x.thread for x in fsms]
