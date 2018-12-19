@@ -2,7 +2,11 @@
 
 """
 Usage:
-    ansible-fsm [options] <fsm.yml>
+    ansible-fsm [options] run <fsm.yml> [<uuid>]
+    ansible-fsm [options] install <uuid> <output>
+    ansible-fsm [options] diff <fsm.yml> <uuid>
+    ansible-fsm [options] update <uuid> <output>
+    ansible-fsm [options] push <fsm.yml> <uuid>
 
 Options:
     -h, --help       Show this page
@@ -23,12 +27,14 @@ from docopt import docopt
 import logging
 import sys
 import yaml
+import requests
 from itertools import count
 from ansible_fsm.event import ZMQEventChannel
 
 from ansible_fsm.parser import parse_to_ast
 from .tracer import ConsoleTraceLog, FileSystemTraceLog
 from .fsm import FSMController, State
+from .transforms import designer_to_fsm, Dumper
 
 logger = logging.getLogger('cli')
 
@@ -43,6 +49,43 @@ def main(args=None):
         logging.basicConfig(level=logging.INFO)
     else:
         logging.basicConfig(level=logging.WARNING)
+
+    if parsed_args['run']:
+        return ansible_fsm_run(parsed_args)
+    elif parsed_args['install']:
+        return ansible_fsm_install(parsed_args)
+    elif parsed_args['update']:
+        return ansible_fsm_update(parsed_args)
+    elif parsed_args['push']:
+        return ansible_fsm_push(parsed_args)
+    else:
+        assert False, 'Update the docopt'
+
+
+def ansible_fsm_push(parsed_args):
+    return 0
+
+def ansible_fsm_update(parsed_args):
+    return 0
+
+def ansible_fsm_install(parsed_args):
+
+    SERVER_URL = "https://fsm-designer-svg.com/prototype/download?diagram_id="
+
+    response = requests.get(SERVER_URL + parsed_args['<uuid>'])
+    if response.status_code == requests.codes.ok:
+        with open(parsed_args['<output>'], 'w') as f:
+                f.write(yaml.dump([designer_to_fsm(yaml.safe_load(response.text))],
+                                  Dumper=Dumper,
+                                  default_flow_style=False))
+        return 0
+    else:
+        print("No such FSM found")
+        return 1
+
+
+def ansible_fsm_run(parsed_args):
+
 
     default_inventory = 'localhost ansible_connection=local'
     inventory = default_inventory

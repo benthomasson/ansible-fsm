@@ -15,6 +15,7 @@ requirements = ['docopt',
                 'pyyaml',
                 'pyzmq',
                 'gevent',
+                'requests',
                 'ansible_task_worker']
 
 dependency_links = [
