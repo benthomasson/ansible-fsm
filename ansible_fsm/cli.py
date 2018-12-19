@@ -45,6 +45,10 @@ def main(args=None):
         logging.basicConfig(level=logging.WARNING)
 
     default_inventory = 'localhost ansible_connection=local'
+    inventory = default_inventory
+    if parsed_args['--inventory']:
+        with open(parsed_args['--inventory']) as f:
+            inventory = f.read()
 
     with open(parsed_args['<fsm.yml>']) as f:
         data = yaml.safe_load(f.read())
@@ -60,6 +64,9 @@ def main(args=None):
     fsm_id_seq = count(0)
 
     for fsm in ast.fsms:
+        play_header = dict(name=fsm.name,
+                           hosts=fsm.hosts,
+                           gather_facts=fsm.gather_facts)
         fsm_id = next(fsm_id_seq)
         states = {}
         for state in fsm.states:
@@ -77,7 +84,8 @@ def main(args=None):
                                        tracer,
                                        fsm_registry,
                                        fsm_id_seq,
-                                       parsed_args['--inventory'] or default_inventory)
+                                       inventory,
+                                       play_header)
         fsms.append(fsm_controller)
 
     fsm_threads = [x.thread for x in fsms]

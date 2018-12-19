@@ -77,7 +77,7 @@ def NullChannel(from_fsm, tracer):
 
 class FSMController(object):
 
-    def __init__(self, name, fsm_id, states, initial_state, tracer, channel_tracer, fsm_registry, fsm_id_seq, inventory):
+    def __init__(self, name, fsm_id, states, initial_state, tracer, channel_tracer, fsm_registry, fsm_id_seq, inventory, play_header):
         self.shutting_down = False
         self.is_shutdown = False
         self.fsm_registry = fsm_registry
@@ -89,7 +89,7 @@ class FSMController(object):
         self.states = states
         self.inbox = PriorityQueue()
         self.self_channel = Channel(self, self, tracer, self.inbox)
-        self.worker = AnsibleTaskWorker(tracer, next(fsm_id_seq), inventory)
+        self.worker = AnsibleTaskWorker(tracer, next(fsm_id_seq), inventory, play_header)
         self.worker_output_queue = Queue()
         self.worker.controller.outboxes['output'] = self.worker_output_queue
         self.worker.queue.put(Inventory(0, inventory))
