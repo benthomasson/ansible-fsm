@@ -34,7 +34,10 @@ from ansible_fsm.event import ZMQEventChannel
 from ansible_fsm.parser import parse_to_ast
 from .tracer import ConsoleTraceLog, FileSystemTraceLog
 from .fsm import FSMController, State
-from .transforms import designer_to_fsm, Dumper
+from .transforms import designer_to_fsm, Dumper, fsm_to_designer
+from .conf import settings
+from pprint import pprint
+from gevent_fsm.tools.fsm_diff import fsm_diff
 
 logger = logging.getLogger('cli')
 
@@ -58,30 +61,50 @@ def main(args=None):
         return ansible_fsm_update(parsed_args)
     elif parsed_args['push']:
         return ansible_fsm_push(parsed_args)
+    elif parsed_args['diff']:
+        return ansible_fsm_diff(parsed_args)
     else:
         assert False, 'Update the docopt'
+
+
+def ansible_fsm_diff(parsed_args):
+
+    response = requests.get(settings.server_url + parsed_args['<uuid>'])
+    if response.status_code != requests.codes.ok:
+        print("No such FSM found")
+        return 1
+    designed_fsm = yaml.safe_load(response.text)
+
+    with open(parsed_args['<fsm.yml>']) as f:
+        implementation_fsm = yaml.safe_load(f.read())
+
+    diff = fsm_diff(designed_fsm, fsm_to_designer(implementation_fsm[0]), silent=False)
+
+    if diff['states'] or diff['transitions']:
+        return 1
+    return 0
 
 
 def ansible_fsm_push(parsed_args):
     return 0
 
+
 def ansible_fsm_update(parsed_args):
     return 0
 
+
 def ansible_fsm_install(parsed_args):
 
-    SERVER_URL = "https://fsm-designer-svg.com/prototype/download?diagram_id="
-
-    response = requests.get(SERVER_URL + parsed_args['<uuid>'])
-    if response.status_code == requests.codes.ok:
-        with open(parsed_args['<output>'], 'w') as f:
-                f.write(yaml.dump([designer_to_fsm(yaml.safe_load(response.text))],
-                                  Dumper=Dumper,
-                                  default_flow_style=False))
-        return 0
-    else:
+    response = requests.get(settings.server_url + parsed_args['<uuid>'])
+    if response.status_code != requests.codes.ok:
         print("No such FSM found")
         return 1
+
+    with open(parsed_args['<output>'], 'w') as f:
+            f.write(yaml.dump([designer_to_fsm(yaml.safe_load(response.text))],
+                              Dumper=Dumper,
+                              default_flow_style=False))
+    return 0
 
 
 def ansible_fsm_run(parsed_args):
@@ -141,8 +164,9 @@ def ansible_fsm_run(parsed_args):
     try:
         gevent.joinall(fsm_threads)
     except KeyboardInterrupt:
-        print ('Caught KeyboardInterrupt shutting down...')
+        print ('Caught KeyboardInterrupt')
     finally:
+        print ('Shutting down...')
         for fsm in fsms:
             fsm.shutdown()
         print ('Successful shutdown')

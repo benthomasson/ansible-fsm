@@ -15,7 +15,9 @@ Dumper.add_representer(str, SafeRepresenter.represent_str)
 
 
 def designer_to_fsm(designer):
-    print (designer)
+    """
+    Converts schema from fsm-designer-svg.com to FSM schema.
+    """
     states = [OrderedDict(name=x['label'], handlers={}) for x in sorted(designer['states'], key=lambda x: x['id'])]
     states_map = {x['name']: x for x in states}
     for t in designer['transitions']:
@@ -29,3 +31,21 @@ def designer_to_fsm(designer):
                       gather_facts=True,
                       states=states)
     return fsm
+
+
+def fsm_to_designer(fsm):
+    """
+    Converts FSM schema to schema from fsm-designer-svg.com.
+    """
+    designer = dict(states=[], transitions=[])
+    transitions = designer['transitions']
+
+    designer['states'] = [dict(label=x['name']) for x in fsm['states']]
+    for state in fsm['states']:
+        for handler, tasks in state.get('handlers', {}).items():
+            for task in tasks:
+                if 'change_state' in task:
+                    transitions.append(dict(from_state=state['name'],
+                                            to_state=task['change_state'],
+                                            label=handler))
+    return designer
