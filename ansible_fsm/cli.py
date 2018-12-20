@@ -5,8 +5,8 @@ Usage:
     ansible-fsm [options] run <fsm.yml> [<uuid>]
     ansible-fsm [options] install <uuid> <output>
     ansible-fsm [options] diff <fsm.yml> <uuid>
-    ansible-fsm [options] update <uuid> <output>
-    ansible-fsm [options] push <fsm.yml> <uuid>
+    ansible-fsm [options] merge <fsm.yml> <uuid> [<output>]
+    ansible-fsm [options] push <fsm.yml> [<uuid>]
 
 Options:
     -h, --help       Show this page
@@ -18,6 +18,7 @@ Options:
 from gevent import monkey
 monkey.patch_all()
 import gevent
+import shutil
 
 import logging
 FORMAT = "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
@@ -34,8 +35,9 @@ from ansible_fsm.event import ZMQEventChannel
 from ansible_fsm.parser import parse_to_ast
 from .tracer import ConsoleTraceLog, FileSystemTraceLog
 from .fsm import FSMController, State
-from .transforms import designer_to_fsm, Dumper, fsm_to_designer
+from .transforms import designer_to_fsm, Dumper, fsm_to_designer, Loader
 from .conf import settings
+from .merge import merge_ast
 from pprint import pprint
 from gevent_fsm.tools.fsm_diff import fsm_diff
 
@@ -57,8 +59,8 @@ def main(args=None):
         return ansible_fsm_run(parsed_args)
     elif parsed_args['install']:
         return ansible_fsm_install(parsed_args)
-    elif parsed_args['update']:
-        return ansible_fsm_update(parsed_args)
+    elif parsed_args['merge']:
+        return ansible_fsm_merge(parsed_args)
     elif parsed_args['push']:
         return ansible_fsm_push(parsed_args)
     elif parsed_args['diff']:
@@ -69,7 +71,7 @@ def main(args=None):
 
 def ansible_fsm_diff(parsed_args):
 
-    response = requests.get(settings.server_url + parsed_args['<uuid>'])
+    response = requests.get(settings.download_server_url + parsed_args['<uuid>'])
     if response.status_code != requests.codes.ok:
         print("No such FSM found")
         return 1
@@ -78,7 +80,11 @@ def ansible_fsm_diff(parsed_args):
     with open(parsed_args['<fsm.yml>']) as f:
         implementation_fsm = yaml.safe_load(f.read())
 
-    diff = fsm_diff(designed_fsm, fsm_to_designer(implementation_fsm[0]), silent=False)
+    diff = fsm_diff(designed_fsm,
+                    fsm_to_designer(implementation_fsm[0]),
+                    parsed_args['<uuid>'],
+                    parsed_args['<fsm.yml>'],
+                    silent=False)
 
     if diff['states'] or diff['transitions']:
         return 1
@@ -86,10 +92,50 @@ def ansible_fsm_diff(parsed_args):
 
 
 def ansible_fsm_push(parsed_args):
+
+    with open(parsed_args['<fsm.yml>']) as f:
+        implementation_fsm = yaml.safe_load(f.read())
+
+    files={'file': ('fsm.yml', yaml.dump(fsm_to_designer(implementation_fsm[0])))}
+
+    data = {}
+    if parsed_args['<uuid>']:
+        data['diagram_id'] = parsed_args['<uuid>']
+
+    response = requests.post(settings.upload_server_url, files=files, data=data)
+    print (response.text)
     return 0
 
 
-def ansible_fsm_update(parsed_args):
+def ansible_fsm_merge(parsed_args):
+
+    if ansible_fsm_diff(parsed_args) == 0:
+        print ('No changes')
+        if parsed_args['<output>']:
+            print ('Wrote {}'.format(parsed_args['<output>']))
+            shutil.copy(parsed_args['<fsm.yml>'], parsed_args['<output>'])
+        return 0
+
+    response = requests.get(settings.download_server_url + parsed_args['<uuid>'])
+    if response.status_code != requests.codes.ok:
+        print("No such FSM found")
+        return 1
+
+    design = [designer_to_fsm(yaml.safe_load(response.text))]
+
+    with open(parsed_args['<fsm.yml>']) as f:
+        implementation = yaml.load(f.read(), Loader=Loader)
+
+    merged = merge_ast(design, implementation)
+
+    pprint(merged)
+
+    print('Writing {}'.format(parsed_args['<output>'] or parsed_args['<fsm.yml>']))
+    with open(parsed_args['<output>'] or parsed_args['<fsm.yml>'], 'w') as f:
+            f.write(yaml.dump(merged,
+                              Dumper=Dumper,
+                              default_flow_style=False))
+
     return 0
 
 

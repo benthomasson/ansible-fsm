@@ -19,8 +19,8 @@ requirements = ['docopt',
                 'gevent_fsm',
                 'ansible_task_worker']
 
-dependency_links = [
-                'git+https://github.com/benthomasson/ansible-task-worker.git#egg=ansible_task_worker-0.0.1']
+dependency_links = ['git+https://github.com/benthomasson/gevent-fsm.git#egg=gevent_fsm-0.2.2',
+                    'git+https://github.com/benthomasson/ansible-task-worker.git#egg=ansible_task_worker-0.0.1']
 
 setup_requirements = ['pytest-runner', ]
 
