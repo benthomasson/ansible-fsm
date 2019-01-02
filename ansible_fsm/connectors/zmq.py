@@ -2,16 +2,17 @@
 import zmq.green as zmq
 import gevent
 import yaml
-from . import messages
+from .. import messages
 
 
 class ZMQEventChannel(object):
 
-    def __init__(self, fsm_registry):
+    def __init__(self, fsm_registry, configuration):
         self.fsm_registry = fsm_registry
         self.context = zmq.Context.instance()
         self.socket = self.context.socket(zmq.ROUTER)
-        self.socket.bind('tcp://127.0.0.1:5556')
+        self.socket.bind('tcp://{0}:{1}'.format(configuration.get('bind_address', '127.0.0.1'),
+                                                       configuration.get('bind_port', '5556')))
         self.zmq_thread = gevent.spawn(self.receive_messages)
 
     def receive_messages(self):

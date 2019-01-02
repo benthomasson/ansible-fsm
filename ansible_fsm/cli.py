@@ -13,6 +13,7 @@ Options:
     --debug          Show debug logging
     --verbose        Show verbose logging
     --inventory=<i>  Use a specific inventory
+    --connectors=<c> Connectors file (YAML)
 """
 
 from gevent import monkey
@@ -30,7 +31,7 @@ import sys
 import yaml
 import requests
 from itertools import count
-from ansible_fsm.event import ZMQEventChannel
+from ansible_fsm.connectors import registry as connectors_registry
 
 from ansible_fsm.parser import parse_to_ast
 from .tracer import ConsoleTraceLog, FileSystemTraceLog
@@ -128,8 +129,6 @@ def ansible_fsm_merge(parsed_args):
 
     merged = merge_ast(design, implementation)
 
-    pprint(merged)
-
     print('Writing {}'.format(parsed_args['<output>'] or parsed_args['<fsm.yml>']))
     with open(parsed_args['<output>'] or parsed_args['<fsm.yml>'], 'w') as f:
             f.write(yaml.dump(merged,
@@ -206,7 +205,23 @@ def ansible_fsm_run(parsed_args):
     for fsm in fsms:
         fsm.enter()
 
-    event = ZMQEventChannel(fsm_registry)
+
+    connectors = []
+    if parsed_args['--connectors']:
+        with open(parsed_args['--connectors']) as f:
+            connectors_spec = yaml.safe_load(f.read())
+        if connectors_spec is None:
+            pass
+        elif not isinstance(connectors_spec, list):
+            raise Exception('Connectors file should contain a list of connector specs')
+        else:
+            for connector_spec in connectors_spec:
+                if 'name' not in connector_spec:
+                    raise Exception('Connector spec should contain a \'name\' field')
+                if connector_spec['name'] not in connectors_registry:
+                    raise Exception('Could not find the {0} connector'.format(connector_spec['name']))
+                connectors.append(connectors_registry[connector_spec['name']](fsm_registry, connector_spec))
+
     try:
         gevent.joinall(fsm_threads)
     except KeyboardInterrupt:
