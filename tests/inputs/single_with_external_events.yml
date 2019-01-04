@@ -8,9 +8,15 @@
                 - change_state: A
       - name: A
         handlers:
+            enter:
+                - debug:
+                    msg: A
             event1:
                 - change_state: B
       - name: B
         handlers:
+            enter:
+                - debug:
+                    msg: B
             event2:
                 - change_state: A

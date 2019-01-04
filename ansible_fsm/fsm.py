@@ -2,11 +2,15 @@
 
 import gevent
 from gevent.queue import PriorityQueue, Queue
+from pprint import pformat
 
 from .conf import settings
 from . import messages
 from ansible_task_worker.worker import AnsibleTaskWorker
-from ansible_task_worker.messages import Task, Inventory, TaskComplete, RunnerMessage, ShutdownRequested, ShutdownComplete
+from ansible_task_worker.messages import Task, Inventory, TaskComplete, RunnerMessage, ShutdownRequested, ShutdownComplete, PlaybookFinished
+import logging
+
+logger = logging.getLogger('ansible_fsm.fsm')
 
 class _Channel(object):
 
@@ -186,6 +190,8 @@ class State(object):
                                 return
                             else:
                                 break
+                        else:
+                            logger.info("unhandled: %s", pformat(worker_message))
 
     def handle_change_state(self, controller, task, msg_type):
         controller.self_channel.put((0, messages.Event(controller.fsm_id,

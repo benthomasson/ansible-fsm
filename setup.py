@@ -17,6 +17,7 @@ requirements = ['docopt',
                 'gevent',
                 'requests',
                 'gevent_fsm',
+                'gevent_websocket',
                 'ansible_task_worker']
 
 dependency_links = ['git+https://github.com/benthomasson/gevent-fsm.git#egg=gevent_fsm-0.2.2',
@@ -61,6 +62,7 @@ setup(
         'console_scripts': [
             'ansible-fsm = ansible_fsm.cli:main',
             'send-event = ansible_fsm.send_event:main',
+            'send-event-ws = ansible_fsm.send_event_ws:main',
         ],
     }
 )

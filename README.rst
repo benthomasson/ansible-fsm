@@ -1,6 +1,6 @@
-===========
-Ansible FSM
-===========
+================
+Ansible Automata
+================
 
 
 .. image:: https://img.shields.io/pypi/v/ansible_fsm.svg
@@ -16,7 +16,7 @@ Ansible FSM
 
 
 
-Ansible with FSMs
+Ansible Automata
 
 
 * Free software: Apache Software License 2.0
@@ -26,7 +26,8 @@ Ansible with FSMs
 Features
 --------
 
-* TODO
+* Use ansible modules within automata for always-on event driven automation.
+* Connect automata to event streams using connectors: WebSocket or ZMQ.
 
 Credits
 -------
