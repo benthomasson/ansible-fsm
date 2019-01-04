@@ -1,0 +1,19 @@
+<html>
+<head>
+<script lang="javascript">
+var socket = new WebSocket("ws://localhost:8080/")
+function event1() {
+  console.log('event1');
+  socket.send(JSON.stringify(["Event", {"from_fsm_id": "0", "to_fsm_id": "FSM1", "name": "event1", "args": {}}]));
+}
+function event2() {
+  console.log('event2');
+  socket.send(JSON.stringify(["Event", {"from_fsm_id": "0", "to_fsm_id": "FSM1", "name": "event2", "args": {}}]));
+}
+</script>
+</head>
+<body>
+<button onclick="event1()">Event 1</button>
+<button onclick="event2()">Event 2</button>
+</body>
+</html>
