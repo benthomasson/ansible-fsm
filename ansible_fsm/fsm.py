@@ -7,10 +7,13 @@ from pprint import pformat
 from .conf import settings
 from . import messages
 from ansible_task_worker.worker import AnsibleTaskWorker
-from ansible_task_worker.messages import Task, Inventory, TaskComplete, RunnerMessage, ShutdownRequested, ShutdownComplete, PlaybookFinished
+from ansible_task_worker.messages import Task, Inventory, TaskComplete, RunnerMessage, ShutdownRequested, ShutdownComplete
 import logging
 
 logger = logging.getLogger('ansible_fsm.fsm')
+
+NULL_EVENT = messages.Event(0, 0, 'null', {})
+
 
 class _Channel(object):
 
@@ -100,11 +103,11 @@ class FSMController(object):
         self.thread = gevent.spawn(self.receive_messages)
 
     def enter(self):
-        self.state.exec_handler('enter', self)
+        self.state.exec_handler(self, 'enter', NULL_EVENT)
 
     def change_state(self, state, handling_message_type):
         if self.state:
-            self.state.exec_handler('exit', self)
+            self.state.exec_handler(self, 'exit', NULL_EVENT)
         if settings.instrumented:
             self.tracer.send_trace_message(messages.FSMTrace(self.tracer.trace_order_seq(),
                                                              self.name,
@@ -114,10 +117,10 @@ class FSMController(object):
                                                              handling_message_type))
         self.state = state
         if self.state:
-            self.state.exec_handler('enter', self)
+            self.state.exec_handler(self, 'enter', NULL_EVENT)
 
     def handle_message(self, message_type, message):
-        self.state.exec_handler(message_type, self)
+        self.state.exec_handler(self, message_type, message)
 
     def shutdown(self):
         self.shutting_down = True
@@ -127,7 +130,7 @@ class FSMController(object):
         for _ in range(10):
             gevent.sleep(1)
             worker_message = self.worker_output_queue.get()
-            if isinstance(worker_message, ShutdownComplete) :
+            if isinstance(worker_message, ShutdownComplete):
                 break
         self.is_shutdown = True
 
@@ -142,11 +145,11 @@ class FSMController(object):
             if message_type == 'Shutdown':
                 self.shutdown()
                 break
-            elif message_type == 'ChangeState' and self.state.name != message.args['current_state']:
+            elif message_type == 'ChangeState' and self.state.name != message.data['current_state']:
                 pass
-            elif message_type == 'ChangeState' and self.state.name == message.args['current_state']:
-                self.change_state(self.states[message.args['next_state']],
-                                  message.args['handling_message_type'])
+            elif message_type == 'ChangeState' and self.state.name == message.data['current_state']:
+                self.change_state(self.states[message.data['next_state']],
+                                  message.data['handling_message_type'])
             else:
                 self.handle_message(message_type, message)
 
@@ -160,8 +163,15 @@ class State(object):
         self.name = name
         self.handlers = handlers
 
-    def exec_handler(self, msg_type, controller):
+    def exec_handler(self, controller, msg_type, message):
         if msg_type in self.handlers:
+            if message.data:
+                controller.worker.queue.put(Task(0, 0, [dict(set_fact=dict(cacheable=True,
+                                                                        event=message.data))]))
+                while True:
+                    worker_message = controller.worker_output_queue.get()
+                    if isinstance(worker_message, TaskComplete):
+                        break
             for task_id, task in enumerate(self.handlers[msg_type]):
                 task_failed = False
                 found_special_handler = False
@@ -176,7 +186,7 @@ class State(object):
                     controller.worker.queue.put(Task(task_id, 0, [task]))
                     while True:
                         worker_message = controller.worker_output_queue.get()
-                        if isinstance(worker_message, RunnerMessage) :
+                        if isinstance(worker_message, RunnerMessage):
                             if worker_message.data.get('event_data', {}).get('task', None) == 'pause_for_kernel':
                                 pass
                             elif worker_message.data.get('event_data', {}).get('task', None) == 'include_tasks':
@@ -186,7 +196,7 @@ class State(object):
                                     task_failed = True
                         elif isinstance(worker_message, TaskComplete):
                             if task_failed:
-                                self.exec_handler('failure', controller)
+                                self.exec_handler(controller, 'failure', NULL_EVENT)
                                 return
                             else:
                                 break
@@ -211,9 +221,9 @@ class State(object):
         send_event = task['send_event']
         to_fsm_id = send_event['fsm']
         controller.fsm_registry[to_fsm_id].inbox.put((1, messages.Event(None,
-                                                                  controller.fsm_registry[to_fsm_id].fsm_id,
-                                                                  send_event['name'],
-                                                                  send_event.get('args', {}))))
+                                                                        controller.fsm_registry[to_fsm_id].fsm_id,
+                                                                        send_event['name'],
+                                                                        send_event.get('data', {}))))
         pass
 
 

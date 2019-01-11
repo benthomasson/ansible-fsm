@@ -26,7 +26,7 @@ class ZMQEventChannel(object):
                 self.fsm_registry[to_fsm_id].inbox.put((1, messages.Event(None,
                                                                           self.fsm_registry[to_fsm_id].fsm_id,
                                                                           msg_data['name'],
-                                                                          msg_data['args'])))
+                                                                          msg_data['data'])))
 
                 self.socket.send_multipart([id, b'Processed'])
             else:

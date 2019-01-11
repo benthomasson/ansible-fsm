@@ -32,7 +32,7 @@ class WebSocketChannelApplication(WebSocketApplication):
             FSM_REGISTRY[to_fsm_id].inbox.put((1, messages.Event(None,
                                                   FSM_REGISTRY[to_fsm_id].fsm_id,
                                                   msg_data['name'],
-                                                  msg_data['args'])))
+                                                  msg_data['data'])))
 
             self.ws.send('Processed')
         else:
