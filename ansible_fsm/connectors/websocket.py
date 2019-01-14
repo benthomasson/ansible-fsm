@@ -6,8 +6,10 @@ from .. import messages
 
 from geventwebsocket import WebSocketServer, WebSocketApplication, Resource
 from collections import OrderedDict
+from itertools import count
 
 FSM_REGISTRY = dict()
+message_id_seq = count()
 
 logger = logging.getLogger('ansible_fsm.connectors.websocket')
 
@@ -29,10 +31,12 @@ class WebSocketChannelApplication(WebSocketApplication):
         msg_data = data.pop(0)
         to_fsm_id = msg_data.get('to_fsm_id', None)
         if to_fsm_id in FSM_REGISTRY:
-            FSM_REGISTRY[to_fsm_id].inbox.put((1, messages.Event(None,
-                                                  FSM_REGISTRY[to_fsm_id].fsm_id,
-                                                  msg_data['name'],
-                                                  msg_data['data'])))
+            FSM_REGISTRY[to_fsm_id].inbox.put((1,
+                                               next(message_id_seq),
+                                               messages.Event(None,
+                                                              FSM_REGISTRY[to_fsm_id].fsm_id,
+                                                              msg_data['name'],
+                                                              msg_data['data'])))
 
             self.ws.send('Processed')
         else:

@@ -26,13 +26,13 @@ class _Channel(object):
         self.to_fsm = to_fsm
         self.tracer = tracer
 
-    def put(self, priority_item):
-        priority, item = priority_item
+    def put(self, priority_order_item):
+        priority, order, item = priority_order_item
         self.tracer.send_trace_message(messages.ChannelTrace(self.tracer.trace_order_seq(),
                                                              self.from_fsm.fsm_id if self.from_fsm else None,
                                                              self.to_fsm.fsm_id if self.to_fsm else None,
                                                              item.name))
-        self.queue.put(priority_item)
+        self.queue.put(priority_order_item)
 
     def get(self, block=True, timeout=None):
         return self.queue.get(block, timeout)
@@ -138,7 +138,7 @@ class FSMController(object):
 
         while not self.shutting_down:
             gevent.sleep(0.1)
-            priority, message = self.inbox.get()
+            priority, order, message = self.inbox.get()
             if self.shutting_down:
                 break
             message_type = message.name
@@ -167,7 +167,7 @@ class State(object):
         if msg_type in self.handlers:
             if message.data:
                 controller.worker.queue.put(Task(0, 0, [dict(set_fact=dict(cacheable=True,
-                                                                        event=message.data))]))
+                                                                           event=message.data))]))
                 while True:
                     worker_message = controller.worker_output_queue.get()
                     if isinstance(worker_message, TaskComplete):
@@ -204,26 +204,26 @@ class State(object):
                             logger.info("unhandled: %s", pformat(worker_message))
 
     def handle_change_state(self, controller, task, msg_type):
-        controller.self_channel.put((0, messages.Event(controller.fsm_id,
-                                                       controller.fsm_id,
-                                                       'ChangeState',
-                                                       dict(current_state=self.name,
-                                                            next_state=task['change_state'],
-                                                            handling_message_type=msg_type))))
+        controller.self_channel.put((0, 0, messages.Event(controller.fsm_id,
+                                                          controller.fsm_id,
+                                                          'ChangeState',
+                                                          dict(current_state=self.name,
+                                                               next_state=task['change_state'],
+                                                               handling_message_type=msg_type))))
 
     def handle_shutdown(self, controller, task, msg_type):
-        controller.self_channel.put((0, messages.Event(controller.fsm_id,
-                                                       controller.fsm_id,
-                                                       'Shutdown',
-                                                       dict(handling_message_type=msg_type))))
+        controller.self_channel.put((0, 0, messages.Event(controller.fsm_id,
+                                                          controller.fsm_id,
+                                                          'Shutdown',
+                                                          dict(handling_message_type=msg_type))))
 
     def handle_send_event(self, controller, task, msg_type):
         send_event = task['send_event']
         to_fsm_id = send_event['fsm']
-        controller.fsm_registry[to_fsm_id].inbox.put((1, messages.Event(None,
-                                                                        controller.fsm_registry[to_fsm_id].fsm_id,
-                                                                        send_event['name'],
-                                                                        send_event.get('data', {}))))
+        controller.fsm_registry[to_fsm_id].inbox.put((1, 0, messages.Event(None,
+                                                                           controller.fsm_registry[to_fsm_id].fsm_id,
+                                                                           send_event['name'],
+                                                                           send_event.get('data', {}))))
         pass
 
 

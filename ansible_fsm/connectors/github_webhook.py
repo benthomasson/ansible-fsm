@@ -5,6 +5,7 @@ import gevent
 import json
 import hmac
 from .. import messages
+from itertools import count
 
 
 class GitHubWebHookChannel(object):
@@ -21,6 +22,7 @@ class GitHubWebHookChannel(object):
 
         @self.app.route(self.webhook_url, methods=['GET', 'POST'])
         def index():
+            message_id_seq = count()
             try:
                 if self.sha1_hex_digest is not None:
                     hub_signature = request.headers.get('X-Hub-Signature')
@@ -36,10 +38,12 @@ class GitHubWebHookChannel(object):
                 elif request.method == 'POST':
                     event_type = request.headers.get('X-GitHub-Event')
                     if self.fsm_name in self.fsm_registry:
-                        self.fsm_registry[self.fsm_name].inbox.put((1, messages.Event(None,
-                                                                                      self.fsm_registry[self.fsm_name].fsm_id,
-                                                                                      event_type,
-                                                                                      request.json)))
+                        self.fsm_registry[self.fsm_name].inbox.put((1,
+                                                                    next(message_id_seq),
+                                                                    messages.Event(None,
+                                                                                   self.fsm_registry[self.fsm_name].fsm_id,
+                                                                                   event_type,
+                                                                                   request.json)))
 
                         return json.dumps({'msg': 'Processed!'})
                     else:

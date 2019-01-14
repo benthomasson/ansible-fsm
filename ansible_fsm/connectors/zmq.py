@@ -3,6 +3,7 @@ import zmq.green as zmq
 import gevent
 import yaml
 from .. import messages
+from itertools import count
 
 
 class ZMQEventChannel(object):
@@ -16,6 +17,7 @@ class ZMQEventChannel(object):
         self.zmq_thread = gevent.spawn(self.receive_messages)
 
     def receive_messages(self):
+        message_id_seq = count()
         while True:
             message = self.socket.recv_multipart()
             id = message.pop(0)
@@ -23,10 +25,12 @@ class ZMQEventChannel(object):
             msg_data = yaml.safe_load(message.pop(0).decode())
             to_fsm_id = msg_data.get('to_fsm_id', None)
             if to_fsm_id in self.fsm_registry:
-                self.fsm_registry[to_fsm_id].inbox.put((1, messages.Event(None,
-                                                                          self.fsm_registry[to_fsm_id].fsm_id,
-                                                                          msg_data['name'],
-                                                                          msg_data['data'])))
+                self.fsm_registry[to_fsm_id].inbox.put((1,
+                                                        next(message_id_seq),
+                                                        messages.Event(None,
+                                                                       self.fsm_registry[to_fsm_id].fsm_id,
+                                                                       msg_data['name'],
+                                                                       msg_data['data'])))
 
                 self.socket.send_multipart([id, b'Processed'])
             else:
