@@ -5,13 +5,20 @@
       - name: Start
         handlers:
             enter:
-                - change_state: A
-      - name: A
+                - file:
+                    path: workspace
+                    state: directory
+                    mode: 0755
+                - change_state: Ready
+      - name: Ready
         handlers:
             enter:
                 - debug:
-                    msg: A
+                    msg: Ready
             FileCreatedEvent:
                 - debug:
                     var: event.src_path
+                - unarchive:
+                    src: "{{event.src_path}}"
+                    dest: workspace
                   when: event.src_path.endswith('.zip')
