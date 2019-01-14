@@ -1,0 +1,17 @@
+- name: FSM1
+  gather_facts: False
+  hosts: localhost
+  states:
+      - name: Start
+        handlers:
+            enter:
+                - change_state: A
+      - name: A
+        handlers:
+            enter:
+                - debug:
+                    msg: A
+            FileCreatedEvent:
+                - debug:
+                    var: event.src_path
+                  when: event.src_path.endswith('.zip')
