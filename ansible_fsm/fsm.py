@@ -163,15 +163,33 @@ class State(object):
         self.name = name
         self.handlers = handlers
 
+    def call_set_fact(self, controller, message):
+        controller.worker.queue.put(Task(0, 0, [dict(set_fact=dict(cacheable=True,
+                                                                   event=message.data))]))
+        while True:
+            worker_message = controller.worker_output_queue.get()
+            if isinstance(worker_message, TaskComplete):
+                break
+
+    def call_when(self, controller, task):
+        controller.worker.queue.put(Task(0, 0, [dict(debug=dict(msg="when: " + str(task['when'])),
+                                                     when=task['when'])]))
+        while True:
+            worker_message = controller.worker_output_queue.get()
+            if isinstance(worker_message, RunnerMessage):
+                if worker_message.data.get('event_data', {}).get('task', None) == 'pause_for_kernel':
+                    pass
+                elif worker_message.data.get('event_data', {}).get('task', None) == 'include_tasks':
+                    pass
+                elif worker_message.data.get('event') == 'runner_on_skipped':
+                    return False
+                elif worker_message.data.get('event') == 'runner_on_ok':
+                    return True
+
     def exec_handler(self, controller, msg_type, message):
         if msg_type in self.handlers:
             if message.data:
-                controller.worker.queue.put(Task(0, 0, [dict(set_fact=dict(cacheable=True,
-                                                                           event=message.data))]))
-                while True:
-                    worker_message = controller.worker_output_queue.get()
-                    if isinstance(worker_message, TaskComplete):
-                        break
+                self.call_set_fact(controller, message)
             for task_id, task in enumerate(self.handlers[msg_type]):
                 task_failed = False
                 found_special_handler = False
@@ -204,6 +222,9 @@ class State(object):
                             logger.info("unhandled: %s", pformat(worker_message))
 
     def handle_change_state(self, controller, task, msg_type):
+        if 'when' in task:
+            if not self.call_when(controller, task):
+                return
         controller.self_channel.put((0, 0, messages.Event(controller.fsm_id,
                                                           controller.fsm_id,
                                                           'ChangeState',
