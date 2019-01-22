@@ -241,11 +241,28 @@ class State(object):
     def handle_send_event(self, controller, task, msg_type):
         send_event = task['send_event']
         to_fsm_id = send_event['fsm']
-        controller.fsm_registry[to_fsm_id].inbox.put((1, 0, messages.Event(None,
-                                                                           controller.fsm_registry[to_fsm_id].fsm_id,
-                                                                           send_event['name'],
-                                                                           send_event.get('data', {}))))
-        pass
+        send_event_task = [dict(send_event=dict(event=send_event['name'],
+                                                to_fsm=to_fsm_id,
+                                                from_fsm='0',
+                                                host='127.0.0.1',
+                                                port=5556))]
+        if 'when' in task:
+            send_event_task[0]['send_event']['when'] = task['when']
+        if 'with_items' in task:
+            send_event_task[0]['send_event']['with_items'] = task['with_items']
+
+        controller.worker.queue.put(Task(0, 0, send_event_task))
+        while True:
+            worker_message = controller.worker_output_queue.get()
+            if isinstance(worker_message, RunnerMessage):
+                if worker_message.data.get('event_data', {}).get('task', None) == 'pause_for_kernel':
+                    pass
+                elif worker_message.data.get('event_data', {}).get('task', None) == 'include_tasks':
+                    pass
+                elif worker_message.data.get('event') == 'runner_on_skipped':
+                    return
+                elif worker_message.data.get('event') == 'runner_on_ok':
+                    return
 
 
 class _NullTracer(object):

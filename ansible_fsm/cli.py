@@ -202,8 +202,6 @@ def ansible_fsm_run(parsed_args):
     fsm_threads = [x.thread for x in fsms]
     fsm_registry.update({x.name: x for x in fsms})
 
-    for fsm in fsms:
-        fsm.enter()
 
 
     connectors = []
@@ -221,6 +219,9 @@ def ansible_fsm_run(parsed_args):
                 if connector_spec['name'] not in connectors_registry:
                     raise Exception('Could not find the {0} connector'.format(connector_spec['name']))
                 connectors.append(connectors_registry[connector_spec['name']](fsm_registry, connector_spec))
+
+    for fsm in fsms:
+        fsm.enter()
 
     try:
         gevent.joinall(fsm_threads)
