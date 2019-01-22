@@ -172,7 +172,7 @@ class State(object):
                 break
 
     def call_when(self, controller, task):
-        controller.worker.queue.put(Task(0, 0, [dict(debug=dict(msg="when: " + str(task['when'])),
+        controller.worker.queue.put(Task(0, 0, [dict(when_helper=dict(msg="when: " + str(task['when'])),
                                                      when=task['when'])]))
         while True:
             worker_message = controller.worker_output_queue.get()
