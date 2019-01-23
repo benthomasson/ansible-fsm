@@ -45,6 +45,7 @@ class ZMQEventChannel(object):
                 continue
             to_fsm_id = msg_data.get('to_fsm_id', None)
             if to_fsm_id in self.fsm_registry:
+                logger.info('Sending to {}'.format(to_fsm_id))
                 self.fsm_registry[to_fsm_id].inbox.put((1,
                                                         next(message_id_seq),
                                                         messages.Event(None,
@@ -52,7 +53,9 @@ class ZMQEventChannel(object):
                                                                        msg_data['name'],
                                                                        msg_data['data'])))
 
+                logger.info('Processed')
                 self.socket.send_multipart([id, b'Processed'])
             else:
-                self.socket.send_multipart([id, b'Not Processed'])
+                logger.info('Not processed')
+                self.socket.send_multipart([id, b'Not processed'])
             gevent.sleep(0)

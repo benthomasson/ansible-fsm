@@ -138,19 +138,24 @@ class FSMController(object):
 
         while not self.shutting_down:
             gevent.sleep(0.1)
+            logger.info("Waiting for messages")
             priority, order, message = self.inbox.get()
             if self.shutting_down:
+                logger.info("Ignoring message due to shutdown")
                 break
             message_type = message.name
             if message_type == 'Shutdown':
+                logger.info("Shutting down")
                 self.shutdown()
                 break
             elif message_type == 'ChangeState' and self.state.name != message.data['current_state']:
-                pass
+                logger.info("Ignoring ChangeState message because the current state does not match")
             elif message_type == 'ChangeState' and self.state.name == message.data['current_state']:
+                logger.info("Changing state")
                 self.change_state(self.states[message.data['next_state']],
                                   message.data['handling_message_type'])
             else:
+                logger.info("Handling message {}".format(message_type))
                 self.handle_message(message_type, message)
 
 
@@ -247,9 +252,9 @@ class State(object):
                                                 host='127.0.0.1',
                                                 port=5556))]
         if 'when' in task:
-            send_event_task[0]['send_event']['when'] = task['when']
+            send_event_task[0]['when'] = task['when']
         if 'with_items' in task:
-            send_event_task[0]['send_event']['with_items'] = task['with_items']
+            send_event_task[0]['with_items'] = task['with_items']
 
         controller.worker.queue.put(Task(0, 0, send_event_task))
         while True:

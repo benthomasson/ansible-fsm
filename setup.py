@@ -61,6 +61,7 @@ setup(
     entry_points={
         'console_scripts': [
             'ansible-fsm = ansible_fsm.cli:main',
+            'ansible-automata = ansible_fsm.cli:main',
             'send-event = ansible_fsm.send_event:main',
             'send-event-ws = ansible_fsm.send_event_ws:main',
         ],

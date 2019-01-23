@@ -33,12 +33,10 @@
                     msg: FSM2 Start
                 - send_event:
                     fsm: FSM1
-                    name: event1
-                - send_event:
-                    fsm: FSM1
-                    name: event2
-                - send_event:
-                    fsm: FSM1
-                    name: event1
+                    name: "{{item}}"
+                  with_items:
+                      - event1
+                      - event2
+                      - event1
                 - shutdown:
 
