@@ -14,6 +14,8 @@ logger = logging.getLogger('ansible_fsm.fsm')
 
 NULL_EVENT = messages.Event(0, 0, 'null', {})
 
+DEFAULT_OUTPUT = 'default'
+
 
 class _Channel(object):
 
@@ -84,7 +86,7 @@ def NullChannel(from_fsm, tracer):
 
 class FSMController(object):
 
-    def __init__(self, name, fsm_id, states, initial_state, tracer, channel_tracer, fsm_registry, fsm_id_seq, inventory, play_header):
+    def __init__(self, name, fsm_id, states, initial_state, tracer, channel_tracer, fsm_registry, fsm_id_seq, inventory, play_header, outputs):
         self.shutting_down = False
         self.is_shutdown = False
         self.fsm_registry = fsm_registry
@@ -100,6 +102,9 @@ class FSMController(object):
         self.worker_output_queue = Queue()
         self.worker.controller.outboxes['output'] = self.worker_output_queue
         self.worker.queue.put(Inventory(0, inventory))
+        self.outboxes = dict(default=None)
+        if outputs:
+            self.outboxes.update({name: None for name in outputs})
         self.thread = gevent.spawn(self.receive_messages)
 
     def enter(self):
@@ -245,10 +250,32 @@ class State(object):
 
     def handle_send_event(self, controller, task, msg_type):
         send_event = task['send_event']
-        to_fsm_id = send_event['fsm']
+
+        # Find the destination FSM to send the event to
+        # First check for the FSM name in the send_event task
+        # Second check for a mapping of the outboxes to FSMs
+        # Third use the default mapping
+        # If no FSM is found send no event.
+
+        logger.info(send_event)
+        logger.info(controller.outboxes)
+
+        if 'fsm' in send_event:
+            to_fsm_id = send_event['fsm']
+        elif 'output' in send_event:
+            to_fsm_id = controller.outboxes.get(send_event['output'], None)
+        else:
+            to_fsm_id = controller.outboxes.get(DEFAULT_OUTPUT, None)
+
+        if to_fsm_id is None:
+            logger.info("Dropping event %s", send_event['name'])
+            return
+
+        logger.info("Sending to fsm %s", to_fsm_id)
+
         send_event_task = [dict(send_event=dict(event=send_event['name'],
                                                 to_fsm=to_fsm_id,
-                                                from_fsm='0',
+                                                from_fsm=controller.name,
                                                 host='127.0.0.1',
                                                 port=5556))]
         if 'when' in task:

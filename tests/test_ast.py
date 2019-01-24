@@ -43,7 +43,7 @@ def test_single_with_import_from():
     assert len(single_ast.fsms) == 1
     assert single_ast.fsms[0].name == "FSM1"
     assert single_ast.fsms[0].gather_facts is False
-    assert single_ast.fsms[0].import_from == 'fsm.yml'
+    assert single_ast.fsms[0].import_from == 'tests/inputs/fsm1.yml'
 
 
 def test_single_with_handlers():

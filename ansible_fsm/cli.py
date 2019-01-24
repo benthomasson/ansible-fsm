@@ -2,7 +2,7 @@
 
 """
 Usage:
-    ansible-fsm [options] run <fsm.yml> [<uuid>]
+    ansible-fsm [options] run <fsm.yml> [<channels.yml>] [<uuid>]
     ansible-fsm [options] install <uuid> <output>
     ansible-fsm [options] diff <fsm.yml> <uuid>
     ansible-fsm [options] merge <fsm.yml> <uuid> [<output>]
@@ -33,7 +33,8 @@ import requests
 from itertools import count
 from ansible_fsm.connectors import registry as connectors_registry
 
-from ansible_fsm.parser import parse_to_ast, parse_to_fsm
+import ansible_fsm.parser as fsm_parser
+import ansible_fsm.channels_parser as channels_parser
 from ansible_fsm.ast import FSM
 from .tracer import FileSystemTraceLog
 from .fsm import FSMController, State
@@ -154,18 +155,21 @@ def ansible_fsm_install(parsed_args):
 
 def ansible_fsm_run(parsed_args):
 
+    # Set up inventories
     default_inventory = 'localhost ansible_connection=local'
     inventory = default_inventory
     if parsed_args['--inventory']:
         with open(parsed_args['--inventory']) as f:
             inventory = f.read()
 
+
+    # Build the FSMs
     with open(parsed_args['<fsm.yml>']) as f:
         data = yaml.safe_load(f.read())
 
     fsm_registry = dict()
 
-    ast = parse_to_ast(data)
+    ast = fsm_parser.parse_to_ast(data)
 
     tracer = FileSystemTraceLog('fsm.log')
 
@@ -177,12 +181,13 @@ def ansible_fsm_run(parsed_args):
         if fsm.import_from is not None:
             with open(fsm.import_from) as f:
                 data = yaml.safe_load(f.read())
-                imported_fsm = parse_to_fsm(data)
+                imported_fsm = fsm_parser.parse_to_fsm(data)
                 fsm = FSM(fsm.name or imported_fsm.name,
                           fsm.hosts or imported_fsm.hosts,
                           fsm.gather_facts if fsm.gather_facts is not None else imported_fsm.gather_facts,
                           fsm.roles or imported_fsm.roles,
                           fsm.states or imported_fsm.states,
+                          fsm.outputs or imported_fsm.outputs,
                           None)
         play_header = dict(name=fsm.name,
                            hosts=fsm.hosts,
@@ -205,12 +210,39 @@ def ansible_fsm_run(parsed_args):
                                        fsm_registry,
                                        fsm_id_seq,
                                        inventory,
-                                       play_header)
+                                       play_header,
+                                       fsm.outputs)
         fsms.append(fsm_controller)
 
     fsm_threads = [x.thread for x in fsms]
+
+    # Build the FSM registry
     fsm_registry.update({x.name: x for x in fsms})
 
+
+    # Wire up FSM using channels
+    if parsed_args['<channels.yml>']:
+        with open(parsed_args['<channels.yml>']) as f:
+            data = yaml.safe_load(f.read())
+
+        channels_ast = channels_parser.parse_to_ast(data)
+
+        for channel in channels_ast.channels:
+            from_fsm = fsm_registry.get(channel.from_fsm, None)
+            if from_fsm is None:
+                raise Exception('Could not find an FSM named {} for channel {}'.format(channel.from_fsm, channel.name))
+            to_fsm = fsm_registry.get(channel.to_fsm, None)
+            if from_fsm is None:
+                raise Exception('Could not find an FSM named {} for channel {}'.format(channel.from_fsm, channel.name))
+            if channel.from_queue is not None:
+                if channel.from_queue not in from_fsm.outboxes:
+                    raise Exception('On {} FSM Could not find an output named {} for channel {}'.format(channel.from_fsm, channel.from_queue, channel.name))
+                from_fsm.outboxes[channel.from_queue] = to_fsm.name
+            else:
+                from_fsm.outboxes['default'] = to_fsm.name
+
+
+    # Adds connectors for external events
     connectors = []
     if parsed_args['--connectors']:
         with open(parsed_args['--connectors']) as f:
@@ -227,9 +259,11 @@ def ansible_fsm_run(parsed_args):
                     raise Exception('Could not find the {0} connector'.format(connector_spec['name']))
                 connectors.append(connectors_registry[connector_spec['name']](fsm_registry, connector_spec))
 
+    # Start the FSMs by calling enter on all the FSMs.
     for fsm in fsms:
         fsm.enter()
 
+    # Start all the greenlets for the FSMs
     try:
         gevent.joinall(fsm_threads)
     except KeyboardInterrupt:
