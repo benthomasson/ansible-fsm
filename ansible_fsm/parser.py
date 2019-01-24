@@ -1,3 +1,8 @@
+"""
+Grammar for ansible-automata
+ast := *fsm
+fsm = 
+"""
 
 from . import ast
 
@@ -56,13 +61,15 @@ def parse_to_fsm(input_data):
                                                'hosts',
                                                'gather_facts',
                                                'roles',
-                                               'states'])
+                                               'states',
+                                               'import_from'])
 
     name = input_data.get('name', '')
     hosts = input_data.get('hosts', [])
     gather_facts = input_data.get('gather_facts', True)
     roles = input_data.get('roles', [])
     states = input_data.get('states', [])
+    import_from = input_data.get('import_from', None)
 
     check_type(hosts, (list, str), "Hosts should a be list or string")
     check_type(gather_facts, (bool, str), "gather_facts should a be a boolean or string")
@@ -72,7 +79,7 @@ def parse_to_fsm(input_data):
     new_states = []
     for state in states:
         new_states.append(parse_to_state(state))
-    return ast.FSM(name, hosts, gather_facts, roles, new_states)
+    return ast.FSM(name, hosts, gather_facts, roles, new_states, import_from)
 
 
 def parse_to_ast(input_data):

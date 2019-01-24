@@ -37,6 +37,14 @@ def test_single_with_states():
     assert single_ast.fsms[0].states[0].name == "Start"
     assert single_ast.fsms[0].states[1].name == "End"
 
+def test_single_with_import_from():
+    data = load_test_fsm('single_with_import_from.yml')
+    single_ast = parser.parse_to_ast(data)
+    assert len(single_ast.fsms) == 1
+    assert single_ast.fsms[0].name == "FSM1"
+    assert single_ast.fsms[0].gather_facts is False
+    assert single_ast.fsms[0].import_from == 'fsm.yml'
+
 
 def test_single_with_handlers():
     data = load_test_fsm('single_with_handlers.yml')
