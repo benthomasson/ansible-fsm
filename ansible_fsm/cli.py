@@ -23,7 +23,7 @@ import shutil
 
 import logging
 FORMAT = "[%(asctime)s] %(levelname)s [%(name)s.%(funcName)s:%(lineno)d] %(message)s"
-logging.basicConfig(filename='ansible_fsm.log', level=logging.DEBUG, format=FORMAT) # noqa
+logging.basicConfig(filename='ansible_fsm.log', level=logging.DEBUG, format=FORMAT)  # noqa
 
 from docopt import docopt
 import logging
@@ -33,13 +33,13 @@ import requests
 from itertools import count
 from ansible_fsm.connectors import registry as connectors_registry
 
-from ansible_fsm.parser import parse_to_ast
-from .tracer import ConsoleTraceLog, FileSystemTraceLog
+from ansible_fsm.parser import parse_to_ast, parse_to_fsm
+from ansible_fsm.ast import FSM
+from .tracer import FileSystemTraceLog
 from .fsm import FSMController, State
 from .transforms import designer_to_fsm, Dumper, fsm_to_designer, Loader
 from .conf import settings
 from .merge import merge_ast
-from pprint import pprint
 from gevent_fsm.tools.fsm_diff import fsm_diff
 
 logger = logging.getLogger('cli')
@@ -97,23 +97,23 @@ def ansible_fsm_push(parsed_args):
     with open(parsed_args['<fsm.yml>']) as f:
         implementation_fsm = yaml.safe_load(f.read())
 
-    files={'file': ('fsm.yml', yaml.dump(fsm_to_designer(implementation_fsm[0])))}
+    files = {'file': ('fsm.yml', yaml.dump(fsm_to_designer(implementation_fsm[0])))}
 
     data = {}
     if parsed_args['<uuid>']:
         data['diagram_id'] = parsed_args['<uuid>']
 
     response = requests.post(settings.upload_server_url, files=files, data=data)
-    print (response.text)
+    print(response.text)
     return 0
 
 
 def ansible_fsm_merge(parsed_args):
 
     if ansible_fsm_diff(parsed_args) == 0:
-        print ('No changes')
+        print('No changes')
         if parsed_args['<output>']:
-            print ('Wrote {}'.format(parsed_args['<output>']))
+            print('Wrote {}'.format(parsed_args['<output>']))
             shutil.copy(parsed_args['<fsm.yml>'], parsed_args['<output>'])
         return 0
 
@@ -131,9 +131,9 @@ def ansible_fsm_merge(parsed_args):
 
     print('Writing {}'.format(parsed_args['<output>'] or parsed_args['<fsm.yml>']))
     with open(parsed_args['<output>'] or parsed_args['<fsm.yml>'], 'w') as f:
-            f.write(yaml.dump(merged,
-                              Dumper=Dumper,
-                              default_flow_style=False))
+        f.write(yaml.dump(merged,
+                          Dumper=Dumper,
+                          default_flow_style=False))
 
     return 0
 
@@ -146,14 +146,13 @@ def ansible_fsm_install(parsed_args):
         return 1
 
     with open(parsed_args['<output>'], 'w') as f:
-            f.write(yaml.dump([designer_to_fsm(yaml.safe_load(response.text))],
-                              Dumper=Dumper,
-                              default_flow_style=False))
+        f.write(yaml.dump([designer_to_fsm(yaml.safe_load(response.text))],
+                          Dumper=Dumper,
+                          default_flow_style=False))
     return 0
 
 
 def ansible_fsm_run(parsed_args):
-
 
     default_inventory = 'localhost ansible_connection=local'
     inventory = default_inventory
@@ -175,6 +174,16 @@ def ansible_fsm_run(parsed_args):
     fsm_id_seq = count(0)
 
     for fsm in ast.fsms:
+        if fsm.import_from is not None:
+            with open(fsm.import_from) as f:
+                data = yaml.safe_load(f.read())
+                imported_fsm = parse_to_fsm(data)
+                fsm = FSM(fsm.name or imported_fsm.name,
+                          fsm.hosts or imported_fsm.hosts,
+                          fsm.gather_facts if fsm.gather_facts is not None else imported_fsm.gather_facts,
+                          fsm.roles or imported_fsm.roles,
+                          fsm.states or imported_fsm.states,
+                          None)
         play_header = dict(name=fsm.name,
                            hosts=fsm.hosts,
                            gather_facts=fsm.gather_facts)
@@ -202,8 +211,6 @@ def ansible_fsm_run(parsed_args):
     fsm_threads = [x.thread for x in fsms]
     fsm_registry.update({x.name: x for x in fsms})
 
-
-
     connectors = []
     if parsed_args['--connectors']:
         with open(parsed_args['--connectors']) as f:
@@ -226,11 +233,10 @@ def ansible_fsm_run(parsed_args):
     try:
         gevent.joinall(fsm_threads)
     except KeyboardInterrupt:
-        print ('Caught KeyboardInterrupt')
+        print('Caught KeyboardInterrupt')
     finally:
-        print ('Shutting down...')
+        print('Shutting down...')
         for fsm in fsms:
             fsm.shutdown()
-        print ('Successful shutdown')
+        print('Successful shutdown')
     return 0
-
