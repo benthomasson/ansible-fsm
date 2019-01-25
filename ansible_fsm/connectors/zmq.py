@@ -11,8 +11,9 @@ logger = logging.getLogger('ansible_fsm.connectors.zmq')
 
 class ZMQEventChannel(object):
 
-    def __init__(self, fsm_registry, configuration):
+    def __init__(self, fsm_registry, connector_registry, configuration):
         self.fsm_registry = fsm_registry
+        self.connector_registry = connector_registry
         self.context = zmq.Context.instance()
         self.socket = self.context.socket(zmq.ROUTER)
         self.socket.bind('tcp://{0}:{1}'.format(configuration.get('bind_address', '127.0.0.1'),

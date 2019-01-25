@@ -9,6 +9,7 @@ from collections import OrderedDict
 from itertools import count
 
 FSM_REGISTRY = dict()
+CONNECTOR_REGISTRY = dict()
 message_id_seq = count()
 
 logger = logging.getLogger('ansible_fsm.connectors.websocket')
@@ -45,10 +46,12 @@ class WebSocketChannelApplication(WebSocketApplication):
 
 class WebSocketChannel(object):
 
-    def __init__(self, fsm_registry, configuration):
-        global FSM_REGISTRY
+    def __init__(self, fsm_registry, connector_registry, configuration):
+        global FSM_REGISTRY, CONNECTOR_REGISTRY
         FSM_REGISTRY = fsm_registry
+        CONNECTOR_REGISTRY = connector_registry
         self.fsm_registry = fsm_registry
+        self.connector_registry = connector_registry
         self.bind_address = configuration.get('bind_address', '')
         self.bind_port = int(configuration.get('bind_port', '8080'))
         self.websocket_thread = gevent.spawn(self.receive_messages)

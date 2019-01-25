@@ -10,8 +10,9 @@ from itertools import count
 
 class GitHubWebHookChannel(object):
 
-    def __init__(self, fsm_registry, configuration):
+    def __init__(self, fsm_registry, connector_registry, configuration):
         self.fsm_registry = fsm_registry
+        self.connector_registry = connector_registry
         self.app = Flask(__name__)
         self.host = configuration.get('bind_address', '0.0.0.0')
         self.port = int(configuration.get('bind_port', '80'))

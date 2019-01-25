@@ -9,8 +9,9 @@ from itertools import count
 
 class WatchDogEventChannel(object):
 
-    def __init__(self, fsm_registry, configuration):
+    def __init__(self, fsm_registry, connector_registry, configuration):
         self.fsm_registry = fsm_registry
+        self.connector_registry = connector_registry
         self.path = os.path.abspath(configuration.get('path', '.'))
         self.fsm_name = configuration.get('receiving_fsm', 'FSM1')
         self.watch_thread = gevent.spawn(self.watch_files)

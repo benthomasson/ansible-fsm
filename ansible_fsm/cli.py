@@ -31,7 +31,8 @@ import sys
 import yaml
 import requests
 from itertools import count
-from ansible_fsm.connectors import registry as connectors_registry
+from ansible_fsm.connectors import registry as connectors_type_registry
+from ansible_fsm.connectors import ZMQEventChannel
 
 import ansible_fsm.parser as fsm_parser
 import ansible_fsm.channels_parser as channels_parser
@@ -168,6 +169,7 @@ def ansible_fsm_run(parsed_args):
         data = yaml.safe_load(f.read())
 
     fsm_registry = dict()
+    connectors_registry = dict()
 
     ast = fsm_parser.parse_to_ast(data)
 
@@ -246,9 +248,19 @@ def ansible_fsm_run(parsed_args):
         with open(parsed_args['--connectors']) as f:
             connectors_spec = connectors_parser.parse_to_ast(yaml.safe_load(f.read()))
             for connector_spec in connectors_spec.connectors:
-                if connector_spec.type not in connectors_registry:
+                if connector_spec.type not in connectors_type_registry:
                     raise Exception('Could not find the {0} connector'.format(connector_spec.type))
-                connectors.append(connectors_registry[connector_spec.type](fsm_registry, connector_spec.config))
+                connector = connectors_type_registry[connector_spec.type](fsm_registry, connectors_registry, connector_spec.config)
+                connectors.append(connector)
+                connectors_registry[connector_spec.name] = connector
+
+    for connector in connectors:
+        if isinstance(connector, ZMQEventChannel):
+            break
+    else:
+        connector = ZMQEventChannel(fsm_registry, connectors_registry, {})
+        connectors.append(connector)
+        connectors_registry['zmq'] = connector
 
     # Start the FSMs by calling enter on all the FSMs.
     for fsm in fsms:
