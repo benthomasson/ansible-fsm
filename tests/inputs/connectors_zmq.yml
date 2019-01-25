@@ -1,3 +1,4 @@
 ---
-- name: zmq
+- type: zmq
+  name: zmq
 ...

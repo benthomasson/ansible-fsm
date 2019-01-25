@@ -35,6 +35,7 @@ from ansible_fsm.connectors import registry as connectors_registry
 
 import ansible_fsm.parser as fsm_parser
 import ansible_fsm.channels_parser as channels_parser
+import ansible_fsm.connectors_parser as connectors_parser
 from ansible_fsm.ast import FSM
 from .tracer import FileSystemTraceLog
 from .fsm import FSMController, State
@@ -162,7 +163,6 @@ def ansible_fsm_run(parsed_args):
         with open(parsed_args['--inventory']) as f:
             inventory = f.read()
 
-
     # Build the FSMs
     with open(parsed_args['<fsm.yml>']) as f:
         data = yaml.safe_load(f.read())
@@ -219,7 +219,6 @@ def ansible_fsm_run(parsed_args):
     # Build the FSM registry
     fsm_registry.update({x.name: x for x in fsms})
 
-
     # Wire up FSM using channels
     if parsed_args['<channels.yml>']:
         with open(parsed_args['<channels.yml>']) as f:
@@ -241,23 +240,15 @@ def ansible_fsm_run(parsed_args):
             else:
                 from_fsm.outboxes['default'] = to_fsm.name
 
-
     # Adds connectors for external events
     connectors = []
     if parsed_args['--connectors']:
         with open(parsed_args['--connectors']) as f:
-            connectors_spec = yaml.safe_load(f.read())
-        if connectors_spec is None:
-            pass
-        elif not isinstance(connectors_spec, list):
-            raise Exception('Connectors file should contain a list of connector specs')
-        else:
-            for connector_spec in connectors_spec:
-                if 'name' not in connector_spec:
-                    raise Exception('Connector spec should contain a \'name\' field')
-                if connector_spec['name'] not in connectors_registry:
-                    raise Exception('Could not find the {0} connector'.format(connector_spec['name']))
-                connectors.append(connectors_registry[connector_spec['name']](fsm_registry, connector_spec))
+            connectors_spec = connectors_parser.parse_to_ast(yaml.safe_load(f.read()))
+            for connector_spec in connectors_spec.connectors:
+                if connector_spec.type not in connectors_registry:
+                    raise Exception('Could not find the {0} connector'.format(connector_spec.type))
+                connectors.append(connectors_registry[connector_spec.type](fsm_registry, connector_spec.config))
 
     # Start the FSMs by calling enter on all the FSMs.
     for fsm in fsms:

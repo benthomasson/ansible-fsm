@@ -1,5 +1,6 @@
 ---
-- name: github_webhook
+- type: github_webhook
+  name: github_webhook
   receiving_fsm: FSM1
   bind_port: 8000
   bind_address: 0.0.0.0

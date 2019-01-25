@@ -7,11 +7,16 @@ class ParseException(Exception):
     pass
 
 
-def check_fields(o, type_name, required_fields, all_fields):
+def check_required_fields(o, type_name, required_fields):
 
     for field in required_fields:
         if field not in o.keys():
             raise ParseException("{0} element requires field {1}".format(type_name, field))
+
+
+def check_fields(o, type_name, required_fields, all_fields):
+
+    check_required_fields(o, type_name, required_fields)
 
     for field in o.keys():
         if field not in all_fields:
