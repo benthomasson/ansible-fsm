@@ -5,8 +5,8 @@ from .parser import check_type, check_required_fields
 
 def parse_to_connector(input_data):
 
-    check_type(input_data, dict, "Channel elements should be a dict")
-    check_required_fields(input_data, "Channel", ['type', 'name'])
+    check_type(input_data, dict, "Connector elements should be a dict")
+    check_required_fields(input_data, "Connector", ['type', 'name'])
 
     name = input_data.get('name', '')
     type_name = input_data.get('name', '')
