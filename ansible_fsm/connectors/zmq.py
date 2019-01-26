@@ -16,8 +16,12 @@ class ZMQEventChannel(object):
         self.connector_registry = connector_registry
         self.context = zmq.Context.instance()
         self.socket = self.context.socket(zmq.ROUTER)
-        self.socket.bind('tcp://{0}:{1}'.format(configuration.get('bind_address', '127.0.0.1'),
-                                                configuration.get('bind_port', '5556')))
+        if 'bind_port' in configuration:
+            self.socket_port = configuration.get('bind_port')
+            self.socket.bind('tcp://{0}:{1}'.format(configuration.get('bind_address', '127.0.0.1'),
+                                                    self.socket_port))
+        else:
+            self.socket_port = self.socket.bind_to_random_port('tcp://{0}'.format(configuration.get('bind_address', '127.0.0.1')))
         logger.info('starting zmq_thread')
         self.zmq_thread = gevent.spawn(self.receive_messages)
 
@@ -45,12 +49,13 @@ class ZMQEventChannel(object):
                 logger.error([id, 'Element 2 should be a dict was {}'.format(type(msg_data)).encode()])
                 continue
             to_fsm_id = msg_data.get('to_fsm_id', None)
+            from_fsm_id = msg_data.get('to_fsm_id', None)
             if to_fsm_id in self.fsm_registry:
-                logger.info('Sending to {}'.format(to_fsm_id))
+                logger.info('Sending to FSM {}'.format(to_fsm_id))
                 self.fsm_registry[to_fsm_id].inbox.put((1,
                                                         next(message_id_seq),
-                                                        messages.Event(None,
-                                                                       self.fsm_registry[to_fsm_id].fsm_id,
+                                                        messages.Event(from_fsm_id,
+                                                                       to_fsm_id,
                                                                        msg_data['name'],
                                                                        msg_data['data'])))
 

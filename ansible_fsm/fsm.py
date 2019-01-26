@@ -274,10 +274,11 @@ class State(object):
         logger.info("Sending to fsm %s", to_fsm_id)
 
         send_event_task = [dict(send_event=dict(event=send_event['name'],
+                                                data=send_event.get('data', {}),
                                                 to_fsm=to_fsm_id,
                                                 from_fsm=controller.name,
                                                 host='127.0.0.1',
-                                                port=5556))]
+                                                port=controller.control_socket_port))]
         if 'when' in task:
             send_event_task[0]['when'] = task['when']
         if 'with_items' in task:

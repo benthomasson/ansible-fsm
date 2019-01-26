@@ -256,14 +256,17 @@ def ansible_fsm_run(parsed_args):
 
     for connector in connectors:
         if isinstance(connector, ZMQEventChannel):
+            control_socket_port = connector.socket_port
             break
     else:
         connector = ZMQEventChannel(fsm_registry, connectors_registry, {})
+        control_socket_port = connector.socket_port
         connectors.append(connector)
         connectors_registry['zmq'] = connector
 
     # Start the FSMs by calling enter on all the FSMs.
     for fsm in fsms:
+        fsm.control_socket_port = control_socket_port
         fsm.enter()
 
     # Start all the greenlets for the FSMs
