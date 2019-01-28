@@ -103,6 +103,7 @@ class FSMController(object):
         self.worker.controller.outboxes['output'] = self.worker_output_queue
         self.worker.queue.put(Inventory(0, inventory))
         self.outboxes = dict(default=None)
+        self.last_event = NULL_EVENT
         if outputs:
             self.outboxes.update({name: None for name in outputs})
         self.thread = gevent.spawn(self.receive_messages)
@@ -198,6 +199,7 @@ class State(object):
 
     def exec_handler(self, controller, msg_type, message):
         if msg_type in self.handlers:
+            controller.last_event = message
             if message.data:
                 self.call_set_fact(controller, message)
             for task_id, task in enumerate(self.handlers[msg_type]):
@@ -267,6 +269,12 @@ class State(object):
         else:
             to_fsm_id = controller.outboxes.get(DEFAULT_OUTPUT, None)
 
+        if send_event.get('merge_data', False):
+            data = controller.last_event.data.copy()
+            data.update(send_event.get('data', {}))
+        else:
+            data = send_event.get('data', {})
+
         if to_fsm_id is None:
             logger.info("Dropping event %s", send_event['name'])
             return
@@ -274,7 +282,7 @@ class State(object):
         logger.info("Sending to fsm %s from %s", to_fsm_id, controller.name)
 
         send_event_task = [dict(send_event=dict(event=send_event['name'],
-                                                data=send_event.get('data', {}),
+                                                data=data,
                                                 to_fsm=to_fsm_id,
                                                 from_fsm=controller.name,
                                                 host='127.0.0.1',

@@ -55,7 +55,7 @@ class ZMQEventChannel(object):
             to_fsm_id = msg_data.get('to_fsm_id', None)
             from_fsm_id = msg_data.get('from_fsm_id', None)
             if to_fsm_id in self.fsm_registry:
-                logger.info('Sending to FSM {} from'.format(to_fsm_id, from_fsm_id))
+                logger.info('Sending to FSM {} from {}'.format(to_fsm_id, from_fsm_id))
                 self.fsm_registry[to_fsm_id].inbox.put((1,
                                                         next(message_id_seq),
                                                         messages.Event(from_fsm_id,
