@@ -28,30 +28,34 @@ class ZMQEventChannel(object):
     def receive_messages(self):
         message_id_seq = count()
         while True:
+            to_fsm_id = None
+            from_fsm_id = None
+            client_id = None
             logger.info('waiting on recv_multipart')
             message = self.socket.recv_multipart()
             logger.info(repr(message))
-            id = message.pop(0)
+            client_id = message.pop(0)
             try:
                 msg_type = message.pop(0).decode()
                 msg_data = yaml.safe_load(message.pop(0).decode())
                 logger.info(repr(msg_type))
                 logger.info(repr(msg_data))
             except Exception as e:
-                self.socket.send_multipart([id, b'Error'])
+                self.socket.send_multipart([client_id, b'Error'])
                 logger.error(str(e))
+                continue
             if not isinstance(msg_type, str):
-                self.socket.send_multipart([id, 'Element 1 should be str was {}'.format(type(msg_type)).encode()])
-                logger.error([id, 'Element 1 should be str was {}'.format(type(msg_type)).encode()])
+                self.socket.send_multipart([client_id, 'Element 1 should be str was {}'.format(type(msg_type)).encode()])
+                logger.error([client_id, 'Element 1 should be str was {}'.format(type(msg_type)).encode()])
                 continue
             if not isinstance(msg_data, dict):
-                self.socket.send_multipart([id, 'Element 2 should be a dict was {}'.format(type(msg_data)).encode()])
-                logger.error([id, 'Element 2 should be a dict was {}'.format(type(msg_data)).encode()])
+                self.socket.send_multipart([client_id, 'Element 2 should be a dict was {}'.format(type(msg_data)).encode()])
+                logger.error([client_id, 'Element 2 should be a dict was {}'.format(type(msg_data)).encode()])
                 continue
             to_fsm_id = msg_data.get('to_fsm_id', None)
-            from_fsm_id = msg_data.get('to_fsm_id', None)
+            from_fsm_id = msg_data.get('from_fsm_id', None)
             if to_fsm_id in self.fsm_registry:
-                logger.info('Sending to FSM {}'.format(to_fsm_id))
+                logger.info('Sending to FSM {} from'.format(to_fsm_id, from_fsm_id))
                 self.fsm_registry[to_fsm_id].inbox.put((1,
                                                         next(message_id_seq),
                                                         messages.Event(from_fsm_id,
@@ -60,8 +64,8 @@ class ZMQEventChannel(object):
                                                                        msg_data['data'])))
 
                 logger.info('Processed')
-                self.socket.send_multipart([id, b'Processed'])
+                self.socket.send_multipart([client_id, b'Processed'])
             else:
                 logger.info('Not processed')
-                self.socket.send_multipart([id, b'Not processed'])
+                self.socket.send_multipart([client_id, b'Not processed'])
             gevent.sleep(0)

@@ -271,7 +271,7 @@ class State(object):
             logger.info("Dropping event %s", send_event['name'])
             return
 
-        logger.info("Sending to fsm %s", to_fsm_id)
+        logger.info("Sending to fsm %s from %s", to_fsm_id, controller.name)
 
         send_event_task = [dict(send_event=dict(event=send_event['name'],
                                                 data=send_event.get('data', {}),
