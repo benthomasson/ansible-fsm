@@ -67,14 +67,14 @@ def parse_to_fsm(input_data):
 
     name = input_data.get('name', '')
     hosts = input_data.get('hosts', [])
-    gather_facts = input_data.get('gather_facts', True)
+    gather_facts = input_data.get('gather_facts', None)
     roles = input_data.get('roles', [])
     states = input_data.get('states', [])
     outputs = input_data.get('outputs', [])
     import_from = input_data.get('import_from', None)
 
     check_type(hosts, (list, str), "Hosts should a be list or string")
-    check_type(gather_facts, (bool, str), "gather_facts should a be a boolean or string")
+    check_type(gather_facts, (bool, str, type(None)), "gather_facts should a be a boolean or string")
     check_type(roles, list, "Roles should a be list")
     check_type(states, list, "States should a be list")
     check_type(outputs, list, "Outputs should a be list")

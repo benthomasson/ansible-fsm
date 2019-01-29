@@ -250,8 +250,10 @@ class State(object):
                                                           'Shutdown',
                                                           dict(handling_message_type=msg_type))))
 
+
     def handle_send_event(self, controller, task, msg_type):
         send_event = task['send_event']
+        event_name = send_event.get('name', None)
 
         # Find the destination FSM to send the event to
         # First check for the FSM name in the send_event task
@@ -266,13 +268,20 @@ class State(object):
             to_fsm_id = send_event['fsm']
         elif 'output' in send_event:
             to_fsm_id = controller.outboxes.get(send_event['output'], None)
+        elif send_event.get('requeue', False):
+            to_fsm_id = controller.name
+            event_name = controller.last_event.name
         else:
             to_fsm_id = controller.outboxes.get(DEFAULT_OUTPUT, None)
 
-        if send_event.get('merge_data', False):
+        if send_event.get('send_received', False):
             data = controller.last_event.data.copy()
+            logger.info('send_received with data %r', data)
             data.update(send_event.get('data', {}))
+        elif send_event.get('requeue', False):
+            data = controller.last_event.data.copy()
         else:
+            logger.info('new data')
             data = send_event.get('data', {})
 
         if to_fsm_id is None:
@@ -281,7 +290,7 @@ class State(object):
 
         logger.info("Sending to fsm %s from %s", to_fsm_id, controller.name)
 
-        send_event_task = [dict(send_event=dict(event=send_event['name'],
+        send_event_task = [dict(send_event=dict(event=event_name,
                                                 data=data,
                                                 to_fsm=to_fsm_id,
                                                 from_fsm=controller.name,
@@ -291,6 +300,8 @@ class State(object):
             send_event_task[0]['when'] = task['when']
         if 'with_items' in task:
             send_event_task[0]['with_items'] = task['with_items']
+        if 'with_fileglob' in task:
+            send_event_task[0]['with_fileglob'] = task['with_fileglob']
 
         controller.worker.queue.put(Task(0, 0, send_event_task))
         while True:
