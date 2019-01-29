@@ -1,7 +1,7 @@
 
 
 import gevent
-from gevent.queue import PriorityQueue, Queue
+from gevent.queue import PriorityQueue, Queue, Empty
 from pprint import pformat
 
 from .conf import settings
@@ -98,6 +98,7 @@ class FSMController(object):
         self.state = initial_state
         self.states = states
         self.inbox = PriorityQueue()
+        self.message_buffer = Queue()
         self.self_channel = Channel(self, self, tracer, self.inbox)
         self.worker = AnsibleTaskWorker(tracer, next(fsm_id_seq), inventory, play_header)
         self.worker_output_queue = Queue()
@@ -168,7 +169,7 @@ class FSMController(object):
                 self.handle_message(message_type, message)
 
 
-FSM_TASKS = ['change_state', 'shutdown', 'send_event']
+FSM_TASKS = ['change_state', 'shutdown', 'send_event', 'buffer_message', 'pop_message']
 
 
 class State(object):
@@ -237,7 +238,7 @@ class State(object):
                     if cmd in task:
                         found_special_handler = True
                         special_handler = getattr(self, 'handle_' + cmd)
-                        special_handler(controller, task, msg_type)
+                        special_handler(controller, task, msg_type, message)
                         break
                 if not found_special_handler:
                     logger.info('Running task %s %s', task_id, task)
@@ -280,7 +281,7 @@ class State(object):
                         else:
                             logger.info("unhandled: %s", pformat(worker_message))
 
-    def handle_change_state(self, controller, task, msg_type):
+    def handle_change_state(self, controller, task, msg_type, message):
         if 'when' in task:
             if not self.call_when(controller, task):
                 return
@@ -291,7 +292,7 @@ class State(object):
                                                                next_state=task['change_state'],
                                                                handling_message_type=msg_type))))
 
-    def handle_shutdown(self, controller, task, msg_type):
+    def handle_shutdown(self, controller, task, msg_type, message):
         if 'when' in task:
             if not self.call_when(controller, task):
                 return
@@ -300,8 +301,7 @@ class State(object):
                                                           'Shutdown',
                                                           dict(handling_message_type=msg_type))))
 
-
-    def handle_send_event(self, controller, task, msg_type):
+    def handle_send_event(self, controller, task, msg_type, message):
         send_event = task['send_event']
         event_name = send_event.get('name', None)
 
@@ -369,6 +369,16 @@ class State(object):
                     return
                 elif worker_message.data.get('event') == 'runner_on_ok':
                     return
+
+    def handle_buffer_message(self, controller, task, msg_type, message):
+        controller.message_buffer.put(message)
+
+    def handle_pop_message(self, controller, task, msg_type, message):
+        try:
+            message = controller.message_buffer.get(block=False)
+            controller.self_channel.put((1, 0, message))
+        except Empty:
+            pass
 
 
 class _NullTracer(object):
