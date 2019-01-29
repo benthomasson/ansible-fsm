@@ -106,6 +106,7 @@ class FSMController(object):
         self.outboxes = dict(default=None)
         self.last_event = NULL_EVENT
         self.task_id_seq = count(0)
+        self.failure_count = 0
         if outputs:
             self.outboxes.update({name: None for name in outputs})
         self.thread = gevent.spawn(self.receive_messages)
@@ -177,23 +178,35 @@ class State(object):
         self.handlers = handlers
 
     def call_set_fact(self, controller, message):
-        controller.worker.queue.put(Task(next(controller.task_id_seq),
+        task_id = next(controller.task_id_seq),
+        controller.worker.queue.put(Task(task_id,
                                          0,
                                          [dict(set_fact=dict(cacheable=True,
                                                              event=message.data))]))
         while True:
             worker_message = controller.worker_output_queue.get()
+            if worker_message.id is None:
+                continue
+            if worker_message.id < task_id:
+                continue
             if isinstance(worker_message, TaskComplete):
                 break
 
     def call_when(self, controller, task):
-        controller.worker.queue.put(Task(next(controller.task_id_seq),
+        task_id = next(controller.task_id_seq)
+        controller.worker.queue.put(Task(task_id,
                                          0,
                                          [dict(when_helper=None,
                                                when=task['when'])]))
         while True:
             worker_message = controller.worker_output_queue.get()
             if isinstance(worker_message, RunnerMessage):
+
+                logger.info("worker_message.id %s", worker_message.id)
+                if worker_message.id is None:
+                    continue
+                if worker_message.id < task_id:
+                    continue
                 if worker_message.data.get('event_data', {}).get('task', None) == 'pause_for_kernel':
                     pass
                 elif worker_message.data.get('event_data', {}).get('task', None) == 'include_tasks':
@@ -208,11 +221,17 @@ class State(object):
             if message.name not in ['null', 'failure']:
                 controller.last_event = message
             if message.data:
+                logger.info("Setting facts %s for %s", message.data, message.name)
                 self.call_set_fact(controller, message)
+            else:
+                logger.info("No facts for %s", message.name)
             for task in self.handlers[msg_type]:
                 task_id = next(controller.task_id_seq)
                 task_failed = False
                 found_special_handler = False
+                special_handler = None
+                new_data = None
+                worker_message = None
                 for cmd in FSM_TASKS:
                     # task is a dict
                     if cmd in task:
@@ -225,7 +244,7 @@ class State(object):
                     controller.worker.queue.put(Task(task_id, 0, [task]))
                     while True:
                         worker_message = controller.worker_output_queue.get()
-                        logger.info("Received message id %s", worker_message.id)
+                        logger.info("Received message type %s id %s", type(worker_message).__name__, worker_message.id)
                         if worker_message.id is None:
                             logger.info("dropped: %s", pformat(worker_message))
                             continue
@@ -244,11 +263,14 @@ class State(object):
                         elif isinstance(worker_message, TaskComplete):
                             if task_failed:
                                 logger.info('Calling failure handler')
-                                #self.exec_handler(controller, 'failure', NULL_EVENT)
+                                controller.failure_count += 1
+                                new_data = message.data.copy()
+                                new_data['failure_count'] = controller.failure_count
+                                logger.info('new_data %s', new_data)
                                 controller.self_channel.put((0, 0, messages.Event(controller.fsm_id,
                                                                                   controller.fsm_id,
                                                                                   'failure',
-                                                                                  {})))
+                                                                                  new_data)))
 
                                 return
                             else:
@@ -270,6 +292,9 @@ class State(object):
                                                                handling_message_type=msg_type))))
 
     def handle_shutdown(self, controller, task, msg_type):
+        if 'when' in task:
+            if not self.call_when(controller, task):
+                return
         controller.self_channel.put((0, 0, messages.Event(controller.fsm_id,
                                                           controller.fsm_id,
                                                           'Shutdown',
