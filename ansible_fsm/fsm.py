@@ -179,7 +179,7 @@ class State(object):
         self.handlers = handlers
 
     def call_set_fact(self, controller, message):
-        task_id = next(controller.task_id_seq),
+        task_id = next(controller.task_id_seq)
         controller.worker.queue.put(Task(task_id,
                                          0,
                                          [dict(set_fact=dict(cacheable=True,
